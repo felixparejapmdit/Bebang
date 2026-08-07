@@ -1,0 +1,2340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bebang's Business Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <style>
+        /* Base desktop background for the "Liquid Glass" effect - DARK THEME */
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: background 0.5s ease;
+        }
+        
+        /* Dark Theme Default */
+        .dark-theme {
+            background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%);
+            color: #FFFFFF; /* CONTRAST FIX: Pure white text */
+        }
+        .dark-theme .text-secondary { color: #A8B2C1 !important; } /* CONTRAST FIX: Brighter secondary (slate-300) */
+        .dark-theme #app { background-color: rgba(255, 255, 255, 0.15); } /* Frosted */
+        .dark-theme .glass-panel {
+            background-color: rgba(255, 255, 255, 0.15); /* Frosted */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .dark-theme .glass-item {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .dark-theme .glass-item:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        .dark-theme input:focus, .dark-theme select:focus, .dark-theme .editable-field:focus {
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5); /* Focus Glow */
+            border-color: #4F46E5 !important;
+        }
+        .dark-theme ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); }
+
+        /* Light Theme Definition */
+        .light-theme {
+            background: linear-gradient(135deg, #F0F4F8 0%, #CCD6E0 100%);
+            color: #111827; /* CONTRAST FIX: Darker text (gray-900) */
+        }
+        .light-theme .text-secondary { color: #374151 !important; } /* CONTRAST FIX: Darker secondary (gray-700) */
+        .light-theme .text-white { color: #111827 !important; } /* CONTRAST FIX: Override 'text-white' to be dark */
+        .light-theme #app {
+            background-color: rgba(255, 255, 255, 0.6); /* Frosted */
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1);
+        }
+        .light-theme .glass-panel {
+            background-color: rgba(255, 255, 255, 0.6); /* Frosted */
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1);
+        }
+        .light-theme .glass-item {
+            background-color: rgba(0, 0, 0, 0.05);
+            transition: background-color 0.2s;
+        }
+        .light-theme .glass-item:hover {
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+        .light-theme input:focus, .light-theme select:focus, .light-theme .editable-field:focus {
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5); /* Focus Glow */
+            border-color: #4F46E5 !important;
+        }
+        .light-theme ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.3); }
+        .light-theme .border-white\/10 { border-color: rgba(0, 0, 0, 0.1); }
+        .light-theme .bg-white\/10 { background-color: rgba(0, 0, 0, 0.05); }
+
+        /* Core App Container Styles */
+        #app {
+            width: 100%;
+            height: 100vh;
+            border-radius: 0;
+            max-width: 1280px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        @media (min-width: 640px) {
+            #app {
+                width: 90vw;
+                height: 90vh;
+                border-radius: 20px;
+            }
+        }
+
+        .glass-panel {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .glass-item {
+            transition: background-color 0.2s;
+        }
+        
+        button:not(.nav-button):not(.tour-skip-btn):not(.sub-nav-button):active {
+            transform: scale(0.98);
+            transition: transform 0.1s ease-out;
+        }
+        
+        input:focus, select:focus, .editable-field:focus {
+            outline: none;
+        }
+
+        .flex-layout { flex-direction: column; }
+        @media (min-width: 768px) {
+            .flex-layout { flex-direction: row; }
+        }
+
+        #sidebar {
+            width: 100%; border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            flex-direction: row; overflow-x: auto; padding: 0.5rem 0;
+        }
+        @media (min-width: 768px) {
+            #sidebar {
+                width: 12rem; border-right: 1px solid rgba(255, 255, 255, 0.1); border-bottom: none;
+                flex-direction: column; overflow-x: hidden; padding: 1rem;
+            }
+        }
+        .nav-button-container { flex-shrink: 0; padding: 0 0.25rem; }
+        @media (min-width: 768px) {
+            .nav-button-container { padding: 0; width: 100%; }
+        }
+
+        ::-webkit-scrollbar { height: 6px; width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+
+        .tooltip-container { position: relative; display: inline-block; }
+        .tooltip-text {
+            visibility: hidden; width: 200px; background-color: #334155; color: #fff; text-align: center; border-radius: 6px; padding: 5px 10px;
+            position: absolute; z-index: 100; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s;
+            font-size: 0.75rem; pointer-events: none;
+        }
+        .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+        .light-theme .tooltip-text { background-color: #4B5563; color: #fff; }
+
+        .chart-bar {
+            background-color: #4F46E5; transition: height 0.5s ease-out; border-radius: 3px 3px 0 0;
+            display: flex; justify-content: center; align-items: flex-end; position: relative;
+        }
+        .chart-bar-value {
+            position: absolute; top: -16px; font-size: 0.7rem; color: #fff; white-space: nowrap;
+        }
+        .dark-theme .chart-bar-value { color: #FFFFFF; }
+        .light-theme .chart-bar-value { color: #111827; }
+
+        #drop-zone { border: 2px dashed rgba(255, 255, 255, 0.5); transition: background-color 0.3s; }
+        #drop-zone.drag-over { background-color: rgba(79, 70, 229, 0.2); }
+        .light-theme #drop-zone { border: 2px dashed rgba(0, 0, 0, 0.5); }
+        .light-theme #drop-zone.drag-over { background-color: rgba(79, 70, 229, 0.2); }
+        
+        #content {
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .metric-card-animated {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .metric-card-animated.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .tour-highlight {
+            position: relative;
+            z-index: 1000;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            transform: scale(1.05);
+            transition: all 0.3s ease-in-out;
+        }
+
+        @media print {
+            body { background: white; color: black; padding: 0; margin: 0; }
+            #app, #sidebar, header, .no-print { display: none !important; }
+            .print-area { display: block !important; width: 100%; margin: 0; padding: 0; }
+            .print-area h1, .print-area h2 { color: black; }
+            .print-table th { background-color: #eee !important; color: black !important; }
+            .print-table td, .print-table th { border: 1px solid #ccc !important; padding: 8px; }
+        }
+
+        .sort-icon { display: inline-block; width: 0; height: 0; margin-left: 5px; vertical-align: middle; }
+        .sort-asc { border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 4px solid white; }
+        .sort-desc { border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 4px solid white; }
+        .light-theme .sort-asc { border-bottom: 4px solid #1F2937; }
+        .light-theme .sort-desc { border-top: 4px solid #1F2937; }
+        
+        @media (max-width: 767px) {
+            #sidebar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                background-color: rgba(24, 34, 51, 0.7);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                border-bottom: none;
+                .light-theme #sidebar { background-color: rgba(204, 214, 224, 0.7); border-top: 1px solid rgba(0, 0, 0, 0.1); }
+                flex-direction: row;
+                justify-content: space-around;
+                align-items: center;
+                padding: 0.5rem 0;
+                z-index: 50;
+                overflow-x: hidden;
+            }
+            .nav-button-container {
+                padding: 0;
+                width: auto;
+                flex-grow: 1;
+            }
+            .nav-button {
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                space-x: 0;
+                padding: 0.25rem 0.5rem;
+                height: 56px;
+            }
+            .nav-button span {
+                display: inline !important;
+                font-size: 0.65rem;
+                margin-top: 4px;
+            }
+            #content {
+                padding-bottom: 70px;
+            }
+        }
+
+        #tour-guide-card {
+            background-color: #1f2937; 
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        .light-theme #tour-guide-card { background-color: #F0F4F8; }
+        
+        .sub-nav-button {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .sub-nav-button.active {
+            background-color: #4F46E5; /* primary */
+            color: #fff;
+        }
+        .sub-nav-button:not(.active) {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #A8B2C1; /* secondary */
+        }
+        .sub-nav-button:not(.active):hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .light-theme .sub-nav-button:not(.active) {
+            background-color: rgba(0, 0, 0, 0.05);
+            color: #374151;
+        }
+        .light-theme .sub-nav-button:not(.active):hover {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Modal Animation */
+        .modal-backdrop {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s ease-out, visibility 0s 0.2s;
+        }
+        .modal-backdrop.visible {
+            visibility: visible;
+            opacity: 1;
+            transition: opacity 0.2s ease-out, visibility 0s 0s;
+        }
+        .modal-content {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: all 0.2s ease-out;
+        }
+        .modal-backdrop.visible .modal-content {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Tour Modal Positioning */
+        #tour-modal {
+            /* items-center; REMOVED */
+            justify-center;
+            padding: 4rem 1rem; 
+        }
+
+        /* Editable Price Fields */
+        .editable-field {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .editable-field:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        .light-theme .editable-field {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        .light-theme .editable-field:hover {
+            border-color: rgba(0, 0, 0, 0.3);
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4F46E5',
+                        'secondary': '#A8B2C1',
+                        'accent': '#FBBF24',
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body oncontextmenu="App.hideContextMenu()" class="dark-theme">
+
+    <div id="app" class="glass-panel flex flex-col p-0 overflow-hidden">
+        <header class="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between flex-shrink-0 no-print">
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <svg class="w-6 h-6 sm:w-8 sm:h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10l2-2m-2-6h16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2zm4 4h4m-4 4h4m-4 4h4"></path></svg>
+                <h1 class="text-xl sm:text-2xl font-extrabold text-white">Bebang's Business Management System</h1>
+            </div>
+            <div class="text-xs sm:text-sm text-secondary">
+                Session Active
+            </div>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden flex-layout no-print">
+            <nav id="sidebar" class="flex flex-shrink-0"></nav>
+            <main id="content" class="flex-1 p-4 md:p-6 overflow-y-auto"></main>
+        </div>
+        
+        <div id="print-area" class="print-area hidden p-8 bg-white text-black"></div>
+
+        <div id="message-box" class="modal-backdrop fixed inset-0 bg-black bg-opacity-50 z-[100] items-center justify-center p-4">
+            <div class="modal-content glass-panel p-6 max-w-sm w-full text-center rounded-xl">
+                <p id="message-text" class="text-white font-semibold mb-4">Loading...</p>
+                <button onclick="App.hideMessage()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150 text-sm">Close</button>
+            </div>
+        </div>
+
+        <div id="context-menu" class="glass-panel absolute z-[101] p-2 hidden flex-col rounded-xl shadow-lg">
+            <button onclick="App.handleContextMenuAction('edit')" class="px-4 py-2 text-left glass-item hover:text-primary rounded-lg text-sm">View/Edit</button>
+            <button onclick="App.handleContextMenuAction('delete')" class="px-4 py-2 text-left glass-item hover:text-red-500 rounded-lg text-sm">Delete Item</button>
+        </div>
+
+        <div id="attachment-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-70 z-[102] items-center justify-center p-4">
+            <div class="modal-content glass-panel p-6 max-w-md w-full rounded-xl">
+                <h3 class="text-xl font-bold mb-4 text-white">Attach Photo for <span id="attachment-type-label" class="text-primary"></span></h3>
+                <div id="drop-zone" class="p-6 text-center rounded-xl bg-white/5 h-48 flex flex-col items-center justify-center">
+                    <p class="text-lg font-semibold text-secondary">Drag & Drop Image Here</p>
+                    <p class="text-sm text-secondary mb-3">or Paste from Clipboard, or Click to Select</p>
+                    <div class="tooltip-container">
+                        <input type="file" id="file-input" accept="image/*" class="hidden" onchange="App.handleFileSelect(event)">
+                        <button onclick="document.getElementById('file-input').click()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150 text-sm">Upload Photo</button>
+                        <span class="tooltip-text">Images are auto-compressed to save space!</span>
+                    </div>
+                </div>
+                <div id="preview-area" class="mt-4 hidden max-h-40 overflow-y-auto">
+                    <p class="text-sm text-secondary mb-2">Preview (Will be compressed):</p>
+                    <img id="image-preview" class="max-w-full h-auto rounded-lg border border-white/20" alt="Image Preview">
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="App.hideAttachmentModal()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition duration-150 text-sm">Cancel</button>
+                    <button id="save-attachment-btn" onclick="App.saveAttachment()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-150 text-sm" disabled>Save Attachment</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="tour-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-50 z-[10000] items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+            <div id="tour-guide-card" class="modal-content glass-panel p-6 max-w-md w-full rounded-xl z-[10001]">
+                <h3 id="tour-title" class="text-2xl font-bold text-primary mb-3">Welcome!</h3>
+                <p id="tour-content" class="text-white mb-6">Let's take a quick tour.</p>
+                <div class="flex justify-between items-center">
+                    <button id="tour-skip-btn" onclick="App.closeTour()" class="text-secondary hover:text-white text-sm">Skip (Esc)</button>
+                    <div class="flex space-x-3">
+                        <button id="tour-prev-btn" onclick="App.prevTourStep()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition duration-150 text-sm disabled:opacity-50" disabled>
+                            <span aria-hidden="true">&larr;</span> Prev
+                        </button>
+                        <button id="tour-next-btn" onclick="App.nextTourStep()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150 text-sm">
+                            Next <span aria-hidden="true">&rarr;</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="inventory-log-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-70 z-[102] items-center justify-center p-4">
+            <div class="modal-content glass-panel p-6 max-w-lg w-full rounded-xl">
+                <h3 class="text-xl font-bold mb-4 text-white">Inventory History for <span id="log-item-name" class="text-primary"></span></h3>
+                <div id="log-content" class="space-y-2 max-h-80 overflow-y-auto"></div>
+                <div class="flex justify-end mt-6">
+                    <button onclick="App.hideInventoryLog()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150 text-sm">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="bom-editor-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-70 z-[102] items-center justify-center p-4">
+            <div class="modal-content glass-panel p-6 max-w-lg w-full rounded-xl">
+                <h3 class="text-xl font-bold mb-4 text-white">Recipe (BOM) for <span id="bom-item-name" class="text-primary"></span></h3>
+                <div id="bom-content" class="space-y-2 max-h-60 overflow-y-auto mb-4">
+                    </div>
+                <form id="bom-add-form" class="glass-item p-3 rounded-lg grid grid-cols-3 gap-2">
+                    <select id="bom-add-material" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <option value="">Select Raw Material...</option>
+                        </select>
+                    <input type="number" id="bom-add-qty" value="1" min="0.01" step="0.01" placeholder="Quantity *" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                    <button type="button" onclick="App.addMaterialToBOM()" class="col-span-1 bg-primary text-white font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150 text-sm">
+                        Add Material
+                    </button>
+                </form>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="App.hideBomEditor()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition duration-150 text-sm">Close</button>
+                    <button onclick="App.saveBom()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-150 text-sm">Save Recipe</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+<script type="module">
+        const STORE_NAME = 'BebangBizSystem_v1';
+        const DATA_KEY = 'beb_biz_data_v1';
+        const DB_VERSION = 1;
+
+        const initialData = {
+            inventory: [
+                { id: 'RM-1', type: 'raw', name: 'Plastic Mold Sheet', stock: 100, unit_cost: 250.00, units: 'sheets', price_last_updated: '2025-11-10' },
+                { id: 'RM-2', type: 'raw', name: 'Padding Foam Roll', stock: 50, unit_cost: 175.00, units: 'rolls', price_last_updated: '2025-11-10' },
+                { id: 'RM-3', type: 'raw', name: 'Velcro Straps (Meter)', stock: 200, unit_cost: 30.00, units: 'meters', price_last_updated: '2025-11-10' },
+                { id: 'FG-1', type: 'finished', name: 'Splint', stock: 15, unit_cost: 37.5, sale_price: 1500.00, price_last_updated: '2025-11-10',
+                  bom: [ { material_id: 'RM-1', quantity: 0.1 }, { material_id: 'RM-2', quantity: 0.05 } ]
+                },
+                { id: 'FG-2', type: 'finished', name: 'Hospital Bed (Electric)', stock: 5, unit_cost: 30000.00, sale_price: 75000.00, bom: [], price_last_updated: '2025-11-10' },
+                { id: 'FG-3', type: 'finished', name: 'IV Pump', stock: 20, unit_cost: 5000.00, sale_price: 12500.00, bom: [], price_last_updated: '2025-11-10' }
+            ],
+            customers: [
+                { id: 'CUST-1', name: 'St. Jude Hospital', contact: 'Dr. Smith', status: 'Customer', last_followup: '2025-11-01', phone: '0917-XXX-YYYY' },
+                { id: 'CUST-2', name: 'Midtown Clinic', contact: 'Sarah Lee', status: 'Lead', last_followup: '2025-10-15', phone: '0922-XXX-YYYY' }
+            ],
+            salesOrders: [
+                { id: 'SO-001', customer_id: 'CUST-1', customer_name: 'St. Jude Hospital', date: '2025-11-10', status: 'Delivered/Billed', items: [{ inv_id: 'FG-2', name: 'Hospital Bed (Electric)', qty: 1, price: 75000.00 }], total: 75000.00 },
+                { id: 'SO-002', customer_id: 'CUST-2', customer_name: 'Midtown Clinic', date: '2025-11-08', status: 'Delivered/Billed', items: [{ inv_id: 'FG-1', name: 'Splint', qty: 5, price: 1500.00 }], total: 7500.00 },
+                { id: 'SO-003', customer_id: 'CUST-1', customer_name: 'St. Jude Hospital', date: '2025-11-12', status: 'Pending Delivery', items: [{ inv_id: 'FG-3', name: 'IV Pump', qty: 2, price: 12500.00 }], total: 25000.00 }
+            ],
+            expenses: [
+                { date: '2025-11-01', description: 'Office Rent', amount: 25000.00, category: 'Overhead' },
+                { date: '2025-11-05', description: 'Fuel for Delivery', amount: 3500.00, category: 'Delivery' }
+            ],
+            imageAttachments: [],
+            theme: 'dark',
+            purchaseOrders: [
+                { id: 'PO-001', date: '2025-11-01', status: 'Checked', items: [{ name: 'Plastic Mold Sheet', qty: 100, unit_cost: 250.00, type: 'raw' }] },
+                { id: 'PO-002', date: '2025-11-10', status: 'Arrived', items: [{ name: 'Velcro Straps (Meter)', qty: 200, unit_cost: 30.00, type: 'raw' }] },
+                { id: 'PO-003', date: '2025-11-14', status: 'Ordered', items: [{ name: 'IV Pump', qty: 10, unit_cost: 5000.00, type: 'finished' }] }
+            ],
+            manufacturingOrders: [
+                { id: 'MO-001', date: '2025-11-05', productId: 'FG-1', productName: 'Splint', qty: 10, workerName: 'Jane Doe', status: 'Completed' },
+                { id: 'MO-002', date: '2025-11-14', productId: 'FG-1', productName: 'Splint', qty: 5, workerName: 'John Smith', status: 'In Progress' },
+            ],
+            workers: [
+                { id: crypto.randomUUID(), name: 'Jane Doe' },
+                { id: crypto.randomUUID(), name: 'John Smith' },
+                { id: crypto.randomUUID(), name: 'Splint Team 1' },
+                { id: crypto.randomUUID(), name: 'Assembly Line A' },
+                { id: crypto.randomUUID(), name: 'Maria Dela Cruz' },
+                { id: crypto.randomUUID(), name: 'Warehouse Staff' }
+            ],
+            manualAdjustments: []
+        };
+
+        const emptyData = {
+            inventory: [], customers: [], salesOrders: [], expenses: [],
+            imageAttachments: [], theme: 'dark', purchaseOrders: [],
+            manufacturingOrders: [], workers: [], manualAdjustments: []
+        };
+
+        const App = {
+            data: structuredClone(initialData),
+            currentTab: 'dashboard',
+            db: null,
+            contextTargetId: null,
+            currentAttachment: { base64: null, related_id: null, type: null },
+            
+            tourSteps: [],
+            currentTourStep: -1,
+            originalActiveElement: null,
+            inventoryView: 'finished',
+            currentBomProductId: null, // For BOM Editor
+            generatedReport: null, // For Printable Report
+
+            salesFilterCustomer: 'all',
+            salesSortKey: 'date',
+            salesSortDirection: 'desc',
+            prodLogSortKey: 'date',
+            prodLogSortDirection: 'desc',
+
+
+            // --- Utility Functions ---
+            showMessage(text) {
+                document.getElementById('message-text').textContent = text;
+                document.getElementById('message-box').classList.add('visible');
+            },
+            hideMessage() {
+                document.getElementById('message-box').classList.remove('visible');
+            },
+            formatCurrency(value) {
+                return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
+            },
+            getIcon(tabName) {
+                const icons = {
+                    dashboard: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-10v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>`,
+                    procurement: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>`,
+                    inventory: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10m0-10l-4-2m4 2l4-2m-4 2l4 2m-4-2l-4-2m4 2l4 2"></path></svg>`,
+                    manufacturing: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.568.342 1.252.427 1.932.203z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>`,
+                    sales: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>`,
+                    reports: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5l2 2h3a2 2 0 012 2v10a2 2 0 01-2 2z"></path></svg>`
+                };
+                return icons[tabName.toLowerCase()] || icons['dashboard'];
+            },
+            
+            // --- Theme Functions ---
+            setTheme(theme) {
+                if (theme === 'light') {
+                    document.body.classList.remove('dark-theme');
+                    document.body.classList.add('light-theme');
+                    this.data.theme = 'light';
+                } else {
+                    document.body.classList.remove('light-theme');
+                    document.body.classList.add('dark-theme');
+                    this.data.theme = 'dark';
+                }
+                document.querySelector('header h1').classList.toggle('text-white', this.data.theme === 'dark');
+                document.querySelector('header h1').classList.toggle('text-gray-800', this.data.theme === 'light');
+                this.saveData();
+                if (this.currentTab === 'reports') { this.renderReports(); }
+            },
+
+            // --- Data Persistence ---
+            async initDB() {
+                try {
+                    this.db = localforage.createInstance({ name: STORE_NAME, version: DB_VERSION, storeName: DATA_KEY });
+                    const storedData = await this.db.getItem(DATA_KEY);
+                    if (storedData) {
+                        this.data = { ...initialData, ...storedData };
+                        // Migration
+                        if (!this.data.inventory) this.data.inventory = initialData.inventory;
+                        if (!this.data.customers) this.data.customers = initialData.customers;
+                        if (!this.data.salesOrders) this.data.salesOrders = storedData.orders || initialData.salesOrders;
+                        if (!this.data.purchaseOrders) this.data.purchaseOrders = initialData.purchaseOrders;
+                        if (!this.data.manufacturingOrders) this.data.manufacturingOrders = storedData.productionLog ? storedData.productionLog.map(p => ({...p, status: 'Completed'})) : initialData.manufacturingOrders;
+                        if (!this.data.theme) this.data.theme = initialData.theme;
+                        if (!this.data.workers) this.data.workers = initialData.workers;
+                        if (!this.data.manualAdjustments) this.data.manualAdjustments = initialData.manualAdjustments;
+                        // Add price_last_updated to old items
+                        this.data.inventory.forEach(item => {
+                            if (!item.price_last_updated) item.price_last_updated = '2025-01-01';
+                        });
+                    } else {
+                        await this.db.setItem(DATA_KEY, this.data);
+                    }
+                    
+                    this.setTheme(this.data.theme); 
+                    this.render(this.currentTab);
+                } catch (error) {
+                    console.error('Error initializing DB:', error);
+                    this.showMessage('Database error. Data might not save.');
+                }
+            },
+            async saveData() {
+                try {
+                    await this.db.setItem(DATA_KEY, this.data);
+                } catch (error) {
+                    console.error('Error saving data:', error);
+                }
+            },
+            async saveAndRerender() {
+                await this.saveData();
+                this.render(this.currentTab);
+            },
+            async factoryReset() {
+                const confirmed = confirm("ARE YOU SURE?\n\nThis will permanently delete ALL data (orders, inventory, workers, etc.) and reset the app to zero.\n\nThis cannot be undone.");
+                if (confirmed) {
+                    try {
+                        const currentTheme = this.data.theme;
+                        this.data = structuredClone(emptyData); // Use the new empty state
+                        this.data.theme = currentTheme; // Re-apply theme
+                        await this.saveData(); // Save this new empty state to the DB
+                        this.showMessage('All data cleared. Resetting to zero.');
+                        this.render('dashboard'); // Re-render the UI
+                    } catch (error) {
+                        console.error('Error clearing database:', error);
+                        this.showMessage('Error clearing data. Please clear your browser cache.');
+                    }
+                }
+            },
+
+            // --- Attachment Manager Logic ---
+            openAttachmentModal(relatedId, type) {
+                this.currentAttachment.related_id = relatedId;
+                this.currentAttachment.type = type;
+                this.currentAttachment.base64 = null;
+                document.getElementById('attachment-type-label').textContent = `${type} for ID: ${relatedId}`;
+                document.getElementById('image-preview').src = '';
+                document.getElementById('preview-area').classList.add('hidden');
+                document.getElementById('save-attachment-btn').disabled = true;
+                document.getElementById('attachment-modal').classList.add('visible');
+            },
+            hideAttachmentModal() {
+                document.getElementById('attachment-modal').classList.remove('visible');
+                this.currentAttachment = { base64: null, related_id: null, type: null };
+            },
+            handleFileSelect(event) {
+                let file = null;
+                const dataTransfer = event.dataTransfer;
+                const target = event.target;
+                if (dataTransfer && dataTransfer.files.length) { file = dataTransfer.files[0]; }
+                else if (target && target.files && target.files.length) { file = target.files[0]; }
+                else if (event.clipboardData) {
+                    const items = event.clipboardData.items;
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.indexOf('image') !== -1) { file = items[i].getAsFile(); break; }
+                    }
+                }
+                if (!file || !file.type.startsWith('image/')) {
+                    return this.showMessage("No valid image found.");
+                }
+
+                // --- Image Compression Logic ---
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 800;
+                        const scaleSize = (img.width > MAX_WIDTH) ? MAX_WIDTH / img.width : 1;
+                        canvas.width = img.width * scaleSize;
+                        canvas.height = img.height * scaleSize;
+                        
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                        
+                        this.currentAttachment.base64 = compressedBase64;
+                        document.getElementById('image-preview').src = compressedBase64;
+                        document.getElementById('preview-area').classList.remove('hidden');
+                        document.getElementById('save-attachment-btn').disabled = false;
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                // --- End Compression Logic ---
+            },
+            async saveAttachment() {
+                if (!this.currentAttachment.base64 || !this.currentAttachment.related_id) {
+                    this.showMessage("Error: No image or ID specified."); return;
+                }
+                if (this.currentAttachment.type === 'Inventory') {
+                    this.data.imageAttachments = this.data.imageAttachments.filter(
+                        img => !(img.related_id === this.currentAttachment.related_id && img.type === 'Inventory')
+                    );
+                }
+                this.data.imageAttachments.push({
+                    id: crypto.randomUUID(), related_id: this.currentAttachment.related_id, type: this.currentAttachment.type,
+                    date: new Date().toISOString().split('T')[0], base64: this.currentAttachment.base64
+                });
+                await this.saveAndRerender();
+                this.showMessage(`${this.currentAttachment.type} photo attached successfully!`);
+                this.hideAttachmentModal();
+            },
+
+            // --- *** WORKFLOW LOGIC *** ---
+            
+            // --- 1. PROCUREMENT LOGIC ---
+            async createPO() {
+                const itemName = document.getElementById('po-item-name').value.trim();
+                const itemQty = parseInt(document.getElementById('po-item-qty').value);
+                const itemCost = parseFloat(document.getElementById('po-item-cost').value);
+                const itemType = document.getElementById('po-item-type').value;
+
+                if (!itemName || itemQty <= 0 || itemCost < 0) {
+                    return this.showMessage('Please enter a valid item name, quantity, and cost.');
+                }
+                const poId = `PO-${String(this.data.purchaseOrders.length + 1).padStart(3, '0')}`;
+                this.data.purchaseOrders.unshift({
+                    id: poId, date: new Date().toISOString().split('T')[0], status: 'Draft',
+                    items: [{ name: itemName, qty: itemQty, unit_cost: itemCost, type: itemType }]
+                });
+                document.getElementById('po-item-name').value = '';
+                document.getElementById('po-item-qty').value = '1';
+                document.getElementById('po-item-cost').value = '100';
+                this.showMessage(`Purchase Order ${poId} created as Draft.`);
+                await this.saveAndRerender();
+            },
+            async advancePOStatus(poId, nextStatus) {
+                const po = this.data.purchaseOrders.find(p => p.id === poId);
+                if (!po) return;
+                if (nextStatus === 'Checked') {
+                    po.items.forEach(item => {
+                        let invItem = this.data.inventory.find(i => i.name === item.name);
+                        if (invItem) {
+                            invItem.stock += item.qty;
+                            invItem.unit_cost = item.unit_cost;
+                            invItem.price_last_updated = new Date().toISOString().split('T')[0]; // Update timestamp
+                        } else {
+                            const newId = item.type === 'raw' ? `RM-${this.data.inventory.length + 1}` : `FG-${this.data.inventory.length + 1}`;
+                            this.data.inventory.push({
+                                id: newId, type: item.type, name: item.name,
+                                stock: item.qty, unit_cost: item.unit_cost, units: 'units',
+                                bom: [], price_last_updated: new Date().toISOString().split('T')[0]
+                            });
+                        }
+                    });
+                    this.showMessage(`PO ${poId} checked in. Inventory updated.`);
+                } else {
+                    this.showMessage(`PO ${poId} status updated to ${nextStatus}.`);
+                }
+                po.status = nextStatus;
+                await this.saveAndRerender();
+            },
+
+            // --- 2. INVENTORY LOGIC ---
+            async addManualStock() {
+                const itemName = document.getElementById('adj-item-name').value.trim();
+                const itemType = document.getElementById('adj-item-type').value;
+                const qty = parseInt(document.getElementById('adj-qty').value);
+                const cost = parseFloat(document.getElementById('adj-cost').value);
+                const reason = document.getElementById('adj-reason').value.trim() || 'Manual adjustment';
+                
+                if (!itemName || qty <= 0 || cost < 0) {
+                    return this.showMessage('Please enter a valid item name, quantity, and cost.');
+                }
+                
+                let invItem = this.data.inventory.find(i => i.name === itemName);
+                if (invItem) {
+                    invItem.stock += qty;
+                    invItem.unit_cost = cost; // Update to this cost
+                    invItem.price_last_updated = new Date().toISOString().split('T')[0];
+                } else {
+                    const newId = itemType === 'raw' ? `RM-${this.data.inventory.length + 1}` : `FG-${this.data.inventory.length + 1}`;
+                    invItem = {
+                        id: newId, type: itemType, name: itemName,
+                        stock: qty, unit_cost: cost, units: 'units', bom: [],
+                        price_last_updated: new Date().toISOString().split('T')[0]
+                    };
+                    this.data.inventory.push(invItem);
+                }
+                
+                this.data.manualAdjustments.push({
+                    id: `ADJ-${String(this.data.manualAdjustments.length + 1).padStart(3, '0')}`,
+                    date: new Date().toISOString().split('T')[0],
+                    itemId: invItem.id,
+                    itemName: invItem.name,
+                    qty: qty,
+                    reason: reason
+                });
+                
+                this.showMessage(`${qty} units of ${itemName} added to inventory.`);
+                
+                document.getElementById('adj-item-name').value = '';
+                document.getElementById('adj-qty').value = '1';
+                document.getElementById('adj-cost').value = '0';
+                document.getElementById('adj-reason').value = '';
+                
+                await this.saveAndRerender();
+            },
+            setInventoryView(view) {
+                this.inventoryView = view;
+                this.render(this.currentTab);
+            },
+            showInventoryLog(itemId) {
+                const item = this.data.inventory.find(i => i.id === itemId);
+                if (!item) return;
+                document.getElementById('log-item-name').textContent = item.name;
+                let logHTML = '';
+                this.data.manualAdjustments.forEach(adj => {
+                    if (adj.itemId === item.id) {
+                        logHTML += `<div class="glass-item p-2 rounded-lg text-sm"><span class="font-bold text-green-400">[+${adj.qty}]</span> from Manual Adjustment (${adj.id}) on ${adj.date}</div>`;
+                    }
+                });
+                this.data.purchaseOrders.filter(po => po.status === 'Checked').forEach(po => {
+                    po.items.forEach(poItem => {
+                        if (poItem.name === item.name) {
+                            logHTML += `<div class="glass-item p-2 rounded-lg text-sm"><span class="font-bold text-green-400">[+${poItem.qty}]</span> from Purchase Order ${po.id} on ${po.date}</div>`;
+                        }
+                    });
+                });
+                this.data.manufacturingOrders.filter(mo => mo.status === 'Completed').forEach(mo => {
+                    if (mo.productId === item.id) {
+                        logHTML += `<div class="glass-item p-2 rounded-lg text-sm"><span class="font-bold text-green-400">[+${mo.qty}]</span> from Manufacturing Order ${mo.id} on ${mo.date}</div>`;
+                    } else {
+                        const product = this.data.inventory.find(i => i.id === mo.productId);
+                        if (product && product.bom) {
+                            product.bom.forEach(bomItem => {
+                                if (bomItem.material_id === item.id) {
+                                    logHTML += `<div class="glass-item p-2 rounded-lg text-sm"><span class="font-bold text-red-400">[-${bomItem.quantity * mo.qty}]</span> used for MO ${mo.id} on ${mo.date}</div>`;
+                                }
+                            });
+                        }
+                    }
+                });
+                this.data.salesOrders.filter(so => so.status === 'Delivered/Billed').forEach(so => {
+                    so.items.forEach(soItem => {
+                        if (soItem.inv_id === item.id) {
+                            logHTML += `<div class="glass-item p-2 rounded-lg text-sm"><span class="font-bold text-red-400">[-${soItem.qty}]</span> for Sales Order ${so.id} on ${so.date}</div>`;
+                        }
+                    });
+                });
+                document.getElementById('log-content').innerHTML = logHTML || '<p class="text-secondary">No history found.</p>';
+                document.getElementById('inventory-log-modal').classList.add('visible');
+            },
+            hideInventoryLog() {
+                document.getElementById('inventory-log-modal').classList.remove('visible');
+            },
+            async updateInventoryPrice(itemId, field, element) {
+                const item = this.data.inventory.find(i => i.id === itemId);
+                if (!item) return;
+                
+                const newValue = parseFloat(element.innerText);
+                if (isNaN(newValue) || newValue < 0) {
+                    this.showMessage('Invalid price. Please enter a valid number.');
+                    element.innerText = (item[field] || 0).toFixed(2); // Revert
+                    return;
+                }
+                
+                item[field] = newValue;
+                item.price_last_updated = new Date().toISOString().split('T')[0];
+                element.blur(); // Remove focus
+                this.showMessage(`${item.name} ${field.replace('_', ' ')} updated.`);
+                await this.saveData();
+                this.render(this.currentTab);
+            },
+            showBomEditor(productId) {
+                const product = this.data.inventory.find(i => i.id === productId);
+                if (!product) return;
+                
+                this.currentBomProductId = productId;
+                document.getElementById('bom-item-name').textContent = product.name;
+                
+                const materialOptions = this.data.inventory
+                    .filter(i => i.type === 'raw')
+                    .map(m => `<option value="${m.id}">${m.name}</option>`)
+                    .join('');
+                document.getElementById('bom-add-material').innerHTML = `<option value="">Select Raw Material...</option>${materialOptions}`;
+                
+                this.renderBomList();
+                document.getElementById('bom-editor-modal').classList.add('visible');
+            },
+            hideBomEditor() {
+                document.getElementById('bom-editor-modal').classList.remove('visible');
+                this.currentBomProductId = null;
+            },
+            renderBomList() {
+                const product = this.data.inventory.find(i => i.id === this.currentBomProductId);
+                const bomContent = document.getElementById('bom-content');
+                if (!product || product.bom.length === 0) {
+                    bomContent.innerHTML = '<p class="text-secondary text-sm text-center py-4">No materials in this recipe. Add one below.</p>';
+                    return;
+                }
+                bomContent.innerHTML = product.bom.map(item => {
+                    const material = this.data.inventory.find(i => i.id === item.material_id);
+                    return `
+                        <div class="glass-item p-2 rounded-lg flex justify-between items-center">
+                            <span class="text-white">${material ? material.name : 'Unknown Material'}</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-secondary text-sm">Qty:</span>
+                                <span class="font-bold text-primary">${item.quantity}</span>
+                                <button onclick="App.removeMaterialFromBOM('${item.material_id}')" class="text-red-500 hover:text-red-400 text-lg">&times;</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            },
+            addMaterialToBOM() {
+                const product = this.data.inventory.find(i => i.id === this.currentBomProductId);
+                if (!product) return;
+                
+                const materialId = document.getElementById('bom-add-material').value;
+                const quantity = parseFloat(document.getElementById('bom-add-qty').value);
+                
+                if (!materialId || isNaN(quantity) || quantity <= 0) {
+                    return this.showMessage('Please select a material and enter a valid quantity.');
+                }
+                
+                if (product.bom.find(i => i.material_id === materialId)) {
+                    return this.showMessage('Material already in BOM. Remove it first to change quantity.');
+                }
+                
+                product.bom.push({ material_id: materialId, quantity: quantity });
+                this.renderBomList();
+            },
+            removeMaterialFromBOM(materialId) {
+                const product = this.data.inventory.find(i => i.id === this.currentBomProductId);
+                if (!product) return;
+                product.bom = product.bom.filter(i => i.material_id !== materialId);
+                this.renderBomList();
+            },
+            async saveBom() {
+                this.hideBomEditor();
+                this.showMessage('Recipe (BOM) saved successfully!');
+                await this.saveData(); // Save without re-render
+            },
+
+            // --- 3. MANUFACTURING LOGIC ---
+            _runProduction(productId, quantity, workerName) {
+                const product = this.data.inventory.find(i => i.id === productId);
+                if (!product) throw new Error(`Product ID ${productId} not found.`);
+                if (!product.bom || product.bom.length === 0) {
+                    throw new Error(`No recipe (BOM) set for ${product.name}. Please edit it in the Inventory tab.`);
+                }
+                const needed = product.bom.map(item => ({
+                    item: this.data.inventory.find(i => i.id === item.material_id),
+                    needed: item.quantity * quantity
+                }));
+                const shortages = needed.filter(n => !n.item || n.item.stock < n.needed);
+                if (shortages.length > 0) {
+                    throw new Error(`Insufficient stock. Missing: ${shortages.map(s => `${s.item.name} (Need: ${s.needed.toFixed(2)}, Have: ${s.item.stock})`).join(', ')}`);
+                }
+                let totalCost = 0;
+                product.bom.forEach(item => {
+                    const material = this.data.inventory.find(i => i.id === item.material_id);
+                    const neededQty = item.quantity * quantity;
+                    material.stock -= neededQty;
+                    totalCost += (material.unit_cost || 0) * neededQty;
+                });
+                product.stock += quantity;
+                this.data.expenses.push({
+                    date: new Date().toISOString().split('T')[0],
+                    description: `Production: ${product.name} x${quantity} (Material Cost)`,
+                    amount: totalCost, category: 'Production Cost'
+                });
+                return true;
+            },
+            async quickLogProduction() {
+                const productId = document.getElementById('mo-quick-product').value;
+                const quantity = parseInt(document.getElementById('mo-quick-qty').value);
+                const workerName = document.getElementById('mo-quick-worker').value;
+                const product = this.data.inventory.find(i => i.id === productId);
+
+                if (!product || quantity <= 0 || !workerName) {
+                    return this.showMessage('Please select a valid product, quantity, and worker.');
+                }
+                try {
+                    this._runProduction(productId, quantity, workerName);
+                    const moId = `MO-${String(this.data.manufacturingOrders.length + 1).padStart(3, '0')}`;
+                    this.data.manufacturingOrders.unshift({
+                        id: moId, date: new Date().toISOString().split('T')[0],
+                        productId: product.id, productName: product.name,
+                        qty: quantity, workerName: workerName, status: 'Completed'
+                    });
+                    this.showMessage(`Quick Log successful: ${quantity} units of ${product.name} added to inventory.`);
+                    await this.saveAndRerender();
+                } catch (error) {
+                    return this.showMessage(`Error: ${error.message}`);
+                }
+            },
+            async createMO() {
+                const productId = document.getElementById('mo-plan-product').value;
+                const quantity = parseInt(document.getElementById('mo-plan-qty').value);
+                const workerName = document.getElementById('mo-plan-worker').value;
+                const product = this.data.inventory.find(i => i.id === productId);
+                if (!product || quantity <= 0 || !workerName) {
+                    return this.showMessage('Please select a valid product, quantity, and worker.');
+                }
+                const moId = `MO-${String(this.data.manufacturingOrders.length + 1).padStart(3, '0')}`;
+                this.data.manufacturingOrders.unshift({
+                    id: moId, date: new Date().toISOString().split('T')[0],
+                    productId: product.id, productName: product.name,
+                    qty: quantity, workerName: workerName, status: 'Pending'
+                });
+                this.showMessage(`Planned MO ${moId} created for ${workerName}.`);
+                await this.saveAndRerender();
+            },
+            async advanceMOStatus(moId, nextStatus) {
+                const mo = this.data.manufacturingOrders.find(m => m.id === moId);
+                if (!mo) return;
+                try {
+                    if (nextStatus === 'In Progress') {
+                        const product = this.data.inventory.find(i => i.id === mo.productId);
+                        const needed = product.bom.map(item => ({
+                            item: this.data.inventory.find(i => i.id === item.material_id),
+                            needed: item.quantity * mo.qty
+                        }));
+                        const shortages = needed.filter(n => !n.item || n.item.stock < n.needed);
+                        if (shortages.length > 0) {
+                            throw new Error(`Insufficient stock to start. Missing: ${shortages.map(s => `${s.item.name} (Need: ${s.needed.toFixed(2)}, Have: ${s.item.stock})`).join(', ')}`);
+                        }
+                        this.showMessage(`MO ${moId} started. Materials allocated.`);
+                    } else if (nextStatus === 'Completed') {
+                        this._runProduction(mo.productId, mo.qty, mo.workerName);
+                        this.showMessage(`MO ${moId} completed. ${mo.qty} units of ${mo.productName} added to inventory.`);
+                    }
+                    mo.status = nextStatus;
+                    await this.saveAndRerender();
+                } catch (error) {
+                    return this.showMessage(`Error: ${error.message}`);
+                }
+            },
+
+            // --- 4. SALES LOGIC ---
+            async createSO() {
+                const customerId = document.getElementById('so-customer').value;
+                const itemId = document.getElementById('so-item').value;
+                const quantity = parseInt(document.getElementById('so-qty').value);
+                const item = this.data.inventory.find(i => i.id === itemId);
+                const customer = this.data.customers.find(c => c.id === customerId);
+                const salePrice = parseFloat(document.getElementById('so-price').value);
+
+                if (!customer || !item || quantity <= 0 || isNaN(salePrice) || salePrice < 0) {
+                    return this.showMessage('Invalid customer, item, quantity, or price.');
+                }
+                if (item.stock < quantity) {
+                    return this.showMessage(`Insufficient stock! Only ${item.stock} units of ${item.name} available.`);
+                }
+                
+                const total = salePrice * quantity;
+                const soId = `SO-${String(this.data.salesOrders.length + 1).padStart(3, '0')}`;
+                
+                this.data.salesOrders.unshift({
+                    id: soId, customer_id: customer.id, customer_name: customer.name,
+                    date: new Date().toISOString().split('T')[0],
+                    status: 'Pending Delivery',
+                    items: [{ inv_id: item.id, name: item.name, qty: quantity, price: salePrice }],
+                    total: total
+                });
+                this.showMessage(`Sales Order ${soId} created.`);
+                await this.saveAndRerender();
+            },
+            async logQuickSale() {
+                const itemId = document.getElementById('pos-item').value;
+                const quantity = parseInt(document.getElementById('pos-qty').value);
+                const item = this.data.inventory.find(i => i.id === itemId);
+                const salePrice = parseFloat(document.getElementById('pos-price').value);
+                
+                if (!item || quantity <= 0 || isNaN(salePrice) || salePrice < 0) {
+                    return this.showMessage('Invalid item, quantity, or price.');
+                }
+                if (item.stock < quantity) {
+                    return this.showMessage(`Insufficient stock! Only ${item.stock} units of ${item.name} available.`);
+                }
+                
+                item.stock -= quantity;
+                const total = salePrice * quantity;
+                const soId = `SO-${String(this.data.salesOrders.length + 1).padStart(3, '0')}`;
+                
+                this.data.salesOrders.unshift({
+                    id: soId, customer_id: 'CUST-0', customer_name: 'In-Store / OTC Sale',
+                    date: new Date().toISOString().split('T')[0],
+                    status: 'Completed (In-Store)',
+                    items: [{ inv_id: item.id, name: item.name, qty: quantity, price: salePrice }],
+                    total: total
+                });
+                this.showMessage(`In-Store Sale ${soId} logged.`);
+                await this.saveAndRerender();
+            },
+            async advanceSOStatus(soId, nextStatus) {
+                const so = this.data.salesOrders.find(s => s.id === soId);
+                if (!so) return;
+                if (nextStatus === 'Delivered/Billed') {
+                    try {
+                        so.items.forEach(item => {
+                            const invItem = this.data.inventory.find(i => i.id === item.inv_id);
+                            if (!invItem) throw new Error(`Item ${item.name} not found.`);
+                            if (invItem.stock < item.qty) throw new Error(`Insufficient stock for ${item.name}.`);
+                            invItem.stock -= item.qty;
+                        });
+                        this.showMessage(`SO ${soId} fulfilled. Inventory updated.`);
+                    } catch (error) {
+                        return this.showMessage(`Error fulfilling SO: ${error.message}`);
+                    }
+                }
+                so.status = nextStatus;
+                await this.saveAndRerender();
+            },
+            
+            // --- 5. WORKER & CUSTOMER CRUD ---
+            async addWorker() {
+                const nameInput = document.getElementById('worker-name');
+                const name = nameInput.value.trim();
+                if (!name) return this.showMessage('Worker name cannot be empty.');
+                
+                this.data.workers.push({ id: crypto.randomUUID(), name: name });
+                nameInput.value = '';
+                this.showMessage(`Worker "${name}" added.`);
+                await this.saveAndRerender();
+            },
+            async deleteWorker(workerId) {
+                this.data.workers = this.data.workers.filter(w => w.id !== workerId);
+                this.showMessage(`Worker removed.`);
+                await this.saveAndRerender();
+            },
+            async addCustomer() {
+                const name = document.getElementById('cust-name').value;
+                const contact = document.getElementById('cust-contact').value;
+                const status = document.getElementById('cust-status').value;
+                if (!name) return this.showMessage('Name is required.');
+                
+                this.data.customers.push({
+                    id: `CUST-${this.data.customers.length + 1}`, name: name, contact: contact,
+                    status: status, last_followup: new Date().toISOString().split('T')[0], phone: ''
+                });
+                this.showMessage(`Customer "${name}" added!`);
+                await this.saveAndRerender();
+            },
+
+            // --- Other Utilities ---
+            calculateTotalAssetValue() {
+                return this.data.inventory.reduce((sum, item) => {
+                    const value = item.sale_price || item.unit_cost || 0;
+                    return sum + (item.stock * value);
+                }, 0);
+            },
+            
+            // --- "POWER USER" GUIDED TOUR ---
+            defineTourSteps() {
+                this.tourSteps = [
+                    { title: "Welcome to Bebang's Business Management System!", content: "This is a detailed guide to your app. We'll cover the full workflow from start to finish.", tab: 'dashboard', highlight: '#app' },
+                    { title: "Step 1: Setup Your Team", content: "Before you build, let's add your workers. Go to the 'Reports' tab.", tab: 'reports', highlight: '#nav-btn-container-reports' },
+                    { title: "Power User: Worker Management", content: "Use this 'Worker Management' card to add your 10-15 (or 50+) workers. This creates the dropdown menu for logging production.", tab: 'reports', highlight: '#worker-management-card' },
+                    { title: "Step 2: Log Your Old Stock", content: "Let's add your existing inventory. Go to the 'Inventory' tab. You only need to do this once for your old stock.", tab: 'inventory', highlight: '#nav-btn-container-inventory' },
+                    { title: "Step 3: The Manual Stock Form", content: "Use this 'Manual Stock' form to add items *without* a Purchase Order. **'Item Name'**: The product name (e.g., 'Gauze Pads'). **'Item Type'**: 'Raw Material' or 'Finished Good'.", tab: 'inventory', highlight: '#manual-stock-form' },
+                    { title: "Step 4: Manual Stock Fields", content: "**'Quantity'**: The number you have on-hand. **'Unit Cost (₱)'**: Your estimated cost for one item. This is *vital* for profit tracking. **'Reason'**: Type 'Initial stock count'. Click 'Add to Inventory'.", tab: 'inventory', highlight: '#manual-stock-form' },
+                    { title: "Step 5: Procurement (Buying)", content: "Now, let's buy *new* supplies. Go to the 'Procurement' tab.", tab: 'procurement', highlight: '#nav-btn-container-procurement' },
+                    { title: "Step 6: The Purchase Order Form", content: "This form is for *new* purchases. **'Item Name'**: The product you're buying (e.g., 'Hospital Bed' or 'Padding Foam').", tab: 'procurement', highlight: '#procurement-form' },
+                    { title: "Step 7: Field: 'Item Type'", content: "This field is critical. Select **'Raw Material'** if it's an item you use to *build* something (e.g., 'Padding Foam'). Select **'Finished Good'** if it's an item you *buy and resell* (e.g., 'IV Pump').", tab: 'procurement', highlight: '#po-item-type' },
+                    { title: "Step 8: Field: 'Quantity' & 'Unit Cost (₱)'", content: "Enter the quantity you are ordering and the **Unit Cost (₱)**. This will be your *new* cost for this item. Click **'Create PO'** to save this as a 'Draft'.", tab: 'procurement', highlight: '#procurement-form button' },
+                    { title: "Step 9: PO Workflow: Place Order", content: "Your 'Draft' PO appears here. Click 'Place Order' once you've sent it to your supplier.", tab: 'procurement', highlight: '#po-list-Draft' },
+                    { title: "Step 10: PO Workflow: Receive & Check", content: "When items arrive, find the 'Ordered' PO and click 'Mark as Arrived', then 'Check-In Stock'. This *officially* adds the items to your inventory.", tab: 'procurement', highlight: '#po-list-Ordered' },
+                    { title: "Power User: Fixing Mistakes", content: "If you make a mistake, just **right-click** on the item in the list and select 'Delete' from the menu.", tab: 'procurement', highlight: '#po-list-Draft' },
+                    { title: "Step 11: Back to Inventory", content: "Let's see the new stock. Go to the 'Inventory' tab.", tab: 'inventory', highlight: '#nav-btn-container-inventory' },
+                    { title: "Step 12: Add Inventory Photos", content: "Click the **'Attach Photo'** button on an item. This lets you upload the main product picture. The app *automatically compresses* it to save space!", tab: 'inventory', highlight: '#inventory-list' },
+                    { title: "Step 13: Power User: Edit Prices", content: "Click directly on the **'Cost (₱)'** or **'Price (₱)'** of an item to edit it. Type a new number and click away. The **'Price updated'** date will change. This is now your *new master price*.", tab: 'inventory', highlight: '.editable-field' },
+                    { title: "Step 14: Power User: Set 'Recipe' (BOM)", content: "For items you build (like 'Splint'), click **'Edit BOM'**. This opens the 'recipe' manager for that item.", tab: 'inventory', highlight: '.bom-edit-button' },
+                    { title: "Step 15: Fractional Quantities", content: "Inside the BOM editor, add a **'Raw Material'** and its **'Quantity'**. If one roll of padding makes 20 splints, enter **`0.05`** (1 / 20). This is how you use *parts* of an item. Click 'Save Recipe' when done.", tab: 'inventory', highlight: '#bom-editor-modal' },
+                    { title: "Step 16: Manufacturing (Building)", content: "Now, let's build a splint. Go to the 'Manufacturing' tab.", tab: 'manufacturing', highlight: '#nav-btn-container-manufacturing' },
+                    { title: "Workflow 1: Quick Log (for Stock)", content: "This is your *main* tool for daily work. Use this form to log production that has *already happened*.", tab: 'manufacturing', highlight: '#quick-log-form' },
+                    { title: "Quick Log Fields Explained", content: "Select the **'Product'** ('Splint'), the **'Quantity Produced'**, and the **'Worker'**. The app will use your fractional BOM to deduct the *exact* amount of raw materials.", tab: 'manufacturing', highlight: '#quick-log-form' },
+                    { title: "Workflow 2: Planned Production (MOs)", content: "Use *this* section for large, future, or special-order jobs. It creates a 'Pending' order *before* production starts.", tab: 'manufacturing', highlight: '#mo-form' },
+                    { title: "Step 17: Sales (Selling)", content: "Time to sell! Go to the 'Sales' tab.", tab: 'sales', highlight: '#nav-btn-container-sales' },
+                    { title: "Workflow 1: In-Store Sale (POS)", content: "For a walk-in customer, use this **'Log In-Store Purchase'** form. Select the **Item** and **Quantity**.", tab: 'sales', highlight: '#pos-form' },
+                    { title: "POS: Price Override", content: "The **'Sale Price (₱)'** field auto-fills. You can type over this number to give a discount. Click **'Log Sale'** to finish. This instantly updates inventory and logs the profit.", tab: 'sales', highlight: '#pos-price' },
+                    { title: "Workflow 2: Planned Sale (SO)", content: "For future deliveries, first add a **Customer**... then use the **'Create Sales Order'** form.", tab: 'sales', highlight: '#so-form' },
+                    { title: "SO: Price Override", content: "This form *also* has a **'Sale Price (₱)'** override field. Set the item, quantity, and price, then click 'Generate Order'.", tab: 'sales', highlight: '#so-price' },
+                    { title: "Step 18: Attach Proof", content: "Your new order appears. Use the **'Attach Delivery'** and **'Attach Payment'** buttons to upload photos of the delivery receipt or bank transfer.", tab: 'sales', highlight: '#so-list-Pending Delivery' },
+                    { title: "Step 19: Fulfill & Deliver Order", content: "After attaching proof, click **'Mark as Delivered'**. This is the *critical step* that removes the item from your inventory stock and marks the order as complete.", tab: 'sales', highlight: '#so-list-Pending Delivery' },
+                    { title: "Step 20: Reports & Backups", content: "Finally, let's review everything. Go back to the 'Reports' tab.", tab: 'reports', highlight: '#nav-btn-container-reports' },
+                    { title: "Power User: Generate Reports", content: "Select a period like 'This Week' or 'This Month' and click **'Generate Report'**. This will show your profit, top-selling items, and best workers for that period.", tab: 'reports', highlight: '#reports-generator-card' },
+                    { title: "Review Your Data", content: "You can now see the 'Production Log' (with worker names) and the 'Sales Records'. These tables give you a full overview of your business.", tab: 'reports', highlight: '#production-log-view' },
+                    { title: "CRITICAL: Storage & Backup", content: "All data, including your compressed photos, is stored in your browser. This meter shows how much space you're using. You *must* back it up.", tab: 'reports', highlight: '#backup-card' },
+                    { title: "CRITICAL: Export Backup", content: "Click **'Export Data'** to save a JSON file of your entire database. Do this daily or weekly!", tab: 'reports', highlight: '#backup-card' },
+                    { title: "CRITICAL: Restore Backup", content: "If you move computers or lose data, use **'Restore Data'**. This will *completely overwrite* all current data with the data from your backup file.", tab: 'reports', highlight: '#backup-card' },
+                    { title: "CRITICAL: Factory Reset", content: "If you want to start over from zero, click the red **'Factory Reset'** button. This deletes *everything* permanently.", tab: 'reports', highlight: '#factory-reset-button' },
+                    { title: "You're a Power User!", content: "That's the complete workflow! You can also use shortcuts (Cmd/Ctrl + 1-6) and right-click menus to work faster. You're all set!", tab: 'dashboard', highlight: '#app' }
+                ];
+            },
+            startTour() {
+                this.originalActiveElement = document.activeElement;
+                this.currentTourStep = 0;
+                const modal = document.getElementById('tour-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex', 'visible');
+                document.getElementById('tour-next-btn').focus();
+                this.renderTourStep();
+            },
+            closeTour() {
+                this.currentTourStep = -1;
+                const modal = document.getElementById('tour-modal');
+                modal.classList.remove('visible', 'items-start', 'items-end', 'items-center');
+                modal.classList.add('hidden');
+                this.unhighlightElement();
+                if (this.originalActiveElement) {
+                    this.originalActiveElement.focus();
+                }
+            },
+            nextTourStep() {
+                if (this.currentTourStep < this.tourSteps.length - 1) {
+                    this.currentTourStep++;
+                    this.renderTourStep();
+                } else {
+                    this.closeTour();
+                }
+            },
+            prevTourStep() {
+                if (this.currentTourStep > 0) {
+                    this.currentTourStep--;
+                    this.renderTourStep();
+                }
+            },
+            unhighlightElement() {
+                document.querySelectorAll('.tour-highlight').forEach(el => {
+                    el.classList.remove('tour-highlight');
+                });
+            },
+            async renderTourStep() {
+                const step = this.tourSteps[this.currentTourStep];
+                if (!step) return this.closeTour();
+                this.unhighlightElement();
+                if (this.currentTab !== step.tab) {
+                    this.render(step.tab, { skipAnimation: true, skipSave: true });
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                if (step.highlight && (step.highlight.includes('raw') || step.highlight.includes('finished'))) {
+                    if (step.highlight.includes('raw') && this.inventoryView !== 'raw') {
+                        this.setInventoryView('raw');
+                    } else if (step.highlight.includes('finished') && this.inventoryView !== 'finished') {
+                        this.setInventoryView('finished');
+                    }
+                }
+                document.getElementById('tour-title').textContent = step.title;
+                document.getElementById('tour-content').textContent = step.content;
+                document.getElementById('tour-prev-btn').disabled = (this.currentTourStep === 0);
+                if (this.currentTourStep === this.tourSteps.length - 1) {
+                    document.getElementById('tour-next-btn').textContent = "Finish";
+                } else {
+                    document.getElementById('tour-next-btn').textContent = "Next →";
+                }
+                
+                const target = document.querySelector(step.highlight);
+                const modal = document.getElementById('tour-modal');
+                
+                if (target) {
+                    target.classList.add('tour-highlight');
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    const targetRect = target.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    
+                    if ((targetRect.top + targetRect.height / 2) < (viewportHeight / 2)) {
+                        modal.classList.remove('items-start', 'items-center');
+                        modal.classList.add('items-end');
+                    } else {
+                        modal.classList.remove('items-end', 'items-center');
+                        modal.classList.add('items-start');
+                    }
+                } else {
+                    modal.classList.remove('items-start', 'items-end');
+                    modal.classList.add('items-center');
+                }
+                
+                document.getElementById('tour-next-btn').focus();
+            },
+
+            // --- Renderer Utility Functions ---
+            renderMetricCard(title, value, colorClass, index, isCurrency = true) {
+                const val = isCurrency ? this.formatCurrency(value) : value;
+                return `
+                    <div class="glass-panel p-4 rounded-xl metric-card-animated" data-index="${index}">
+                        <p class="text-xs sm:text-sm text-secondary mb-1">${title}</p>
+                        <p class="text-xl sm:text-2xl font-extrabold ${colorClass}">${val}</p>
+                    </div>
+                `;
+            },
+            renderSidebar() {
+                const tabs = ['Dashboard', 'Procurement', 'Inventory', 'Manufacturing', 'Sales', 'Reports'];
+                const sidebarHTML = tabs.map((tab, index) => {
+                    const tabKey = tab.split(' ')[0].toLowerCase();
+                    return `
+                    <div class="tooltip-container nav-button-container" id="nav-btn-container-${tabKey}">
+                        <button data-tab="${tabKey}" data-shortcut="Cmd/Ctrl + ${index + 1}" class="nav-button glass-item w-full py-2 px-3 md:py-3 rounded-xl text-left flex items-center space-x-1 sm:space-x-3 text-xs sm:text-sm font-medium transition duration-200">
+                            ${this.getIcon(tabKey)}
+                            <span class="hidden sm:inline">${tab}</span>
+                            <span class="inline sm:hidden">${tab.substring(0, 3)}</span>
+                        </button>
+                        <span class="tooltip-text">${tab} Module. Shortcut: Cmd/Ctrl + ${index + 1}</span>
+                    </div>
+                `}).join('');
+                document.getElementById('sidebar').innerHTML = sidebarHTML;
+            },
+
+            // --- Tab Rendering ---
+            renderDashboard() {
+                const totalSales = this.data.salesOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+                const totalExpenses = this.data.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+                const netProfit = totalSales - totalExpenses;
+                const totalAssetValue = this.calculateTotalAssetValue();
+                
+                const dashboardHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-white">Business Dashboard</h2>
+                        <button onclick="App.startTour()" class="bg-primary text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150">Start Detailed Tour</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                        ${this.renderMetricCard('Total Sales YTD', totalSales, 'text-green-400', 0)}
+                        ${this.renderMetricCard('Net Profit YTD', netProfit, netProfit >= 0 ? 'text-blue-400' : 'text-red-400', 1)}
+                        ${this.renderMetricCard('Total Asset Value', totalAssetValue, 'text-accent', 2)}
+                        ${this.renderMetricCard('Pending MOs', this.data.manufacturingOrders.filter(m => m.status !== 'Completed').length, 'text-white', 3, false)}
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${this.renderSalesChart()}
+                        ${this.renderProfitChart()}
+                    </div>
+                `;
+                document.getElementById('content').innerHTML = dashboardHTML;
+                setTimeout(() => {
+                    document.querySelectorAll('.metric-card-animated').forEach((el, index) => {
+                        el.style.transitionDelay = `${index * 50}ms`;
+                        el.classList.add('visible');
+                    });
+                }, 10);
+            },
+            
+            renderProcurement() {
+                const renderPOList = (status) => {
+                    const pos = this.data.purchaseOrders.filter(p => p.status === status);
+                    let actionButton = '';
+                    if (status === 'Draft') {
+                        actionButton = `<button onclick="App.advancePOStatus('{{id}}', 'Ordered')" class="bg-blue-600 text-white text-xs px-3 py-1 rounded-full hover:bg-blue-700">Place Order</button>`;
+                    } else if (status === 'Ordered') {
+                        actionButton = `<button onclick="App.advancePOStatus('{{id}}', 'Arrived')" class="bg-yellow-600 text-white text-xs px-3 py-1 rounded-full hover:bg-yellow-700">Mark as Arrived</button>`;
+                    } else if (status === 'Arrived') {
+                        actionButton = `<button onclick="App.advancePOStatus('{{id}}', 'Checked')" class="bg-green-600 text-white text-xs px-3 py-1 rounded-full hover:bg-green-700">Check-In Stock</button>`;
+                    }
+                    return `
+                        <div class="glass-panel p-4 sm:p-6" id="po-list-${status}">
+                            <h3 class="text-xl font-semibold text-white mb-3">${status} (${pos.length})</h3>
+                            <div class="space-y-3 max-h-60 overflow-y-auto">
+                                ${pos.length > 0 ? pos.map(po => `
+                                    <div class="glass-item p-3 rounded-lg flex justify-between items-center" oncontextmenu="App.showContextMenu(event, '${po.id}', 'po')">
+                                        <div>
+                                            <span class="font-bold text-white">${po.id}</span>
+                                            <span class="text-xs text-secondary block">${po.items.map(i => `${i.name} (x${i.qty})`).join(', ')}</span>
+                                        </div>
+                                        ${actionButton.replace(/{{id}}/g, po.id)}
+                                    </div>
+                                `).join('') : '<p class="text-secondary text-sm">No orders in this status.</p>'}
+                            </div>
+                        </div>
+                    `;
+                };
+                document.getElementById('content').innerHTML = `
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Procurement (Purchase Orders)</h2>
+                    <form id="procurement-form" class="glass-panel p-4 sm:p-6 mb-8 grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <h3 class="text-xl font-semibold text-white col-span-1 md:col-span-5 mb-2">Create New Purchase Order (Draft)</h3>
+                        <input type="text" id="po-item-name" placeholder="Item Name *" class="col-span-1 md:col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        
+                        <select id="po-item-type" class="col-span-1 md:col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <option value="raw">Raw Material</option>
+                            <option value="finished">Finished Good</option>
+                        </select>
+                        
+                        <input type="number" id="po-item-qty" value="1" min="1" placeholder="Quantity *" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <input type="number" id="po-item-cost" value="100" min="0" placeholder="Unit Cost (₱) *" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        
+                        <div class="tooltip-container col-span-1 md:col-span-1">
+                            <button type="button" onclick="App.createPO()" class="bg-primary text-white font-bold w-full py-2 rounded-lg hover:bg-indigo-700 transition duration-150">Create PO</button>
+                            <span class="tooltip-text">Creates a new 'Draft' PO. Find it below to place the order.</span>
+                        </div>
+                    </form>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        ${renderPOList('Draft')}
+                        ${renderPOList('Ordered')}
+                        ${renderPOList('Arrived')}
+                        ${renderPOList('Checked')}
+                    </div>
+                `;
+            },
+            
+            renderInventory() {
+                const renderInvList = (type) => {
+                    const items = this.data.inventory.filter(i => i.type === type);
+                    return `
+                        <div class="space-y-3" id="inventory-list">
+                            ${items.map(i => {
+                                const itemImage = this.data.imageAttachments.find(img => img.related_id === i.id && img.type === 'Inventory');
+                                const bomButton = (i.type === 'finished') ? `<button onclick="App.showBomEditor('${i.id}')" class="bom-edit-button bg-white/10 text-xs px-3 py-1 rounded-full hover:bg-white/20 text-secondary">Edit BOM</button>` : '';
+                                
+                                return `
+                                <div class="glass-item p-3 rounded-lg flex items-center">
+                                    <div class="w-16 h-16 rounded-md bg-white/5 mr-4 flex-shrink-0 flex items-center justify-center">
+                                        ${itemImage ? 
+                                            `<img src="${itemImage.base64}" class="w-full h-full object-cover rounded-md">` : 
+                                            `<svg class="w-8 h-8 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l-1.586-1.586a2 2 0 00-2.828 0L6 14m6-6l.01.01"></path></svg>`
+                                        }
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex flex-col sm:flex-row justify-between sm:items-center">
+                                            <div class="mb-2 sm:mb-0">
+                                                <span class="font-bold text-white">${i.name}</span>
+                                                <span class="text-xs text-secondary block">ID: ${i.id} | Stock: <span class="font-bold text-primary">${i.stock}</span> ${i.units || ''}</span>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                ${bomButton}
+                                                <button onclick="App.showInventoryLog('${i.id}')" class="bg-white/10 text-xs px-3 py-1 rounded-full hover:bg-white/20 text-secondary">History</button>
+                                                <button class="text-primary text-xs ml-2 hover:text-indigo-400" onclick="App.openAttachmentModal('${i.id}', 'Inventory')">Attach Photo</button>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 flex items-center space-x-4">
+                                            <div class="text-sm">
+                                                <span class="text-xs text-secondary">Cost (₱): </span>
+                                                <span class="editable-field" contenteditable="true" onblur="App.updateInventoryPrice('${i.id}', 'unit_cost', this)">${(i.unit_cost || 0).toFixed(2)}</span>
+                                            </div>
+                                            ${i.type === 'finished' ? `
+                                            <div class="text-sm">
+                                                <span class="text-xs text-secondary">Price (₱): </span>
+                                                <span class="editable-field" contenteditable="true" onblur="App.updateInventoryPrice('${i.id}', 'sale_price', this)">${(i.sale_price || 0).toFixed(2)}</span>
+                                            </div>` : ''}
+                                        </div>
+                                        <span class="text-xs text-secondary block mt-1">Price updated: ${i.price_last_updated}</span>
+                                    </div>
+                                </div>
+                            `}).join('')}
+                            ${items.length === 0 ? '<p class="text-secondary text-sm">No items in this category.</p>' : ''}
+                        </div>
+                    `;
+                };
+                
+                document.getElementById('content').innerHTML = `
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Inventory Warehouse</h2>
+                    <div class="flex space-x-2 mb-6">
+                        <button id="inventory-subnav-finished" onclick="App.setInventoryView('finished')" class="sub-nav-button ${this.inventoryView === 'finished' ? 'active' : ''}">
+                            Finished Goods (${this.data.inventory.filter(i => i.type === 'finished').length})
+                        </button>
+                        <button id="inventory-subnav-raw" onclick="App.setInventoryView('raw')" class="sub-nav-button ${this.inventoryView === 'raw' ? 'active' : ''}">
+                            Raw Materials (${this.data.inventory.filter(i => i.type === 'raw').length})
+                        </button>
+                    </div>
+                    
+                    <form id="manual-stock-form" class="glass-panel p-4 sm:p-6 mb-8 grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <h3 class="text-xl font-semibold text-white col-span-1 md:col-span-5 mb-2">Add Old Stock / Manual Adjustment</h3>
+                        <input type="text" id="adj-item-name" placeholder="Item Name *" list="inventory-item-names" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <datalist id="inventory-item-names">
+                            ${this.data.inventory.map(i => `<option value="${i.name}">`).join('')}
+                        </datalist>
+                        <select id="adj-item-type" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <option value="finished">Finished Good</option>
+                            <option value="raw">Raw Material</option>
+                        </select>
+                        <input type="number" id="adj-qty" value="1" min="1" placeholder="Quantity *" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <input type="number" id="adj-cost" value="0" min="0" placeholder="Unit Cost (₱) *" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <input type="text" id="adj-reason" placeholder="Reason (e.g., Initial Stock)" class="col-span-1 md:col-span-3 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <div class="tooltip-container col-span-1 md:col-span-2">
+                            <button type="button" onclick="App.addManualStock()" class="bg-primary text-white font-bold w-full py-2 rounded-lg hover:bg-indigo-700 transition duration-150">Add to Inventory</button>
+                            <span class="tooltip-text">Manually adds stock without a PO. Use for initial setup or corrections.</span>
+                        </div>
+                    </form>
+                    
+                    <h3 class="text-xl font-semibold text-white mb-4 mt-10">Current Inventory</h3>
+                    ${this.inventoryView === 'finished' ? renderInvList('finished') : renderInvList('raw')}
+                `;
+            },
+
+            renderManufacturing() {
+                const buildableProducts = this.data.inventory.filter(i => i.type === 'finished' && i.bom && i.bom.length > 0);
+                
+                const renderMOList = (status) => {
+                    const mos = this.data.manufacturingOrders.filter(m => m.status === status);
+                    let actionButton = '';
+                    if (status === 'Pending') {
+                        actionButton = `<button onclick="App.advanceMOStatus('{{id}}', 'In Progress')" class="bg-blue-600 text-white text-xs px-3 py-1 rounded-full hover:bg-blue-700">Start Production</button>`;
+                    } else if (status === 'In Progress') {
+                        actionButton = `<button onclick="App.advanceMOStatus('{{id}}', 'Completed')" class="bg-green-600 text-white text-xs px-3 py-1 rounded-full hover:bg-green-700">Complete Production</button>`;
+                    }
+                    
+                    return `
+                        <div class="glass-panel p-4 sm:p-6" id="mo-list-${status}">
+                            <h3 class="text-xl font-semibold text-white mb-3">${status} (${mos.length})</h3>
+                            <div class="space-y-3 max-h-60 overflow-y-auto">
+                                ${mos.length > 0 ? mos.map(mo => `
+                                    <div class="glass-item p-3 rounded-lg flex justify-between items-center" oncontextmenu="App.showContextMenu(event, '${mo.id}', 'mo')">
+                                        <div>
+                                            <span class="font-bold text-white">${mo.id}: ${mo.productName} (x${mo.qty})</span>
+                                            <span class="text-xs text-secondary block">Worker: ${mo.workerName} | Date: ${mo.date}</span>
+                                        </div>
+                                        ${actionButton.replace(/{{id}}/g, mo.id)}
+                                    </div>
+                                `).join('') : '<p class="text-secondary text-sm">No orders in this status.</p>'}
+                            </div>
+                        </div>
+                    `;
+                };
+
+                document.getElementById('content').innerHTML = `
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Manufacturing</h2>
+                    
+                    <form id="quick-log-form" class="glass-panel p-4 sm:p-6 mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <h3 class="text-xl font-semibold text-white col-span-1 md:col-span-3 mb-2">🚀 Quick Log Production (for Stock)</h3>
+                        <select id="mo-quick-product" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <option value="">Select Product...</option>
+                            ${buildableProducts.map(i => `<option value="${i.id}">${i.name}</option>`).join('')}
+                        </select>
+                        <input type="number" id="mo-quick-qty" value="1" min="1" placeholder="Quantity Produced *" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <select id="mo-quick-worker" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <option value="">Select Worker *</option>
+                            ${this.data.workers.map(w => `<option value="${w.name}">${w.name}</option>`).join('')}
+                        </select>
+                        <div class="tooltip-container col-span-1 md:col-span-3">
+                            <button type="button" onclick="App.quickLogProduction()" class="bg-accent text-white font-bold w-full py-2 rounded-lg hover:bg-yellow-600 transition duration-150">Log Production</button>
+                            <span class="tooltip-text">Instantly consumes materials (using BOM recipe) and adds finished goods to stock.</span>
+                        </div>
+                    </form>
+
+                    <h3 class="text-xl font-semibold text-white mb-4 mt-10">🗓️ Planned Production (Manufacturing Orders)</h3>
+                    <form id="mo-form" class="glass-panel p-4 sm:p-6 mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <h3 class="text-lg font-semibold text-white col-span-1 md:col-span-3 mb-2">Create New Planned MO</h3>
+                        <select id="mo-plan-product" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <option value="">Select Product to Build...</option>
+                            ${buildableProducts.map(i => `<option value="${i.id}">${i.name}</option>`).join('')}
+                        </select>
+                        <input type="number" id="mo-plan-qty" value="1" min="1" placeholder="Quantity *" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                        <select id="mo-plan-worker" class="col-span-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <option value="">Select Worker *</option>
+                            ${this.data.workers.map(w => `<option value="${w.name}">${w.name}</option>`).join('')}
+                        </select>
+                        <div class="tooltip-container col-span-1 md:col-span-3">
+                            <button type="button" onclick="App.createMO()" class="bg-primary text-white font-bold w-full py-2 rounded-lg hover:bg-indigo-700 transition duration-150">Create MO</button>
+                            <span class="tooltip-text">Creates a new 'Pending' MO. Find it below to start production.</span>
+                        </div>
+                    </form>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        ${renderMOList('Pending')}
+                        ${renderMOList('In Progress')}
+                        ${renderMOList('Completed')}
+                    </div>
+                `;
+            },
+
+            renderSales() {
+                const sellableItems = this.data.inventory.filter(i => i.type === 'finished');
+                
+                const renderSOList = (status, filter) => {
+                    const sos = this.data.salesOrders.filter(filter);
+                    let actionButton = '';
+                    if (status === 'Pending Delivery') {
+                        actionButton = `<button onclick="App.advanceSOStatus('{{id}}', 'Delivered/Billed')" class="bg-green-600 text-white text-xs px-3 py-1 rounded-full hover:bg-green-700">Mark as Delivered</button>`;
+                    }
+                    
+                    return `
+                        <div class="glass-panel p-4" id="so-list-${status.replace(/[^a-zA-Z0-9]/g, '-')}">
+                            <h3 class="text-lg font-semibold text-white mb-3">${status} (${sos.length})</h3>
+                            <div class="space-y-3 max-h-60 overflow-y-auto">
+                                ${sos.length > 0 ? sos.map(so => {
+                                    const customer = this.data.customers.find(c => c.id === so.customer_id) || { name: so.customer_name };
+                                    const deliveryImage = this.data.imageAttachments.find(img => img.related_id === so.id && img.type === 'Delivery');
+                                    const paymentImage = this.data.imageAttachments.find(img => img.related_id === so.id && img.type === 'Payment');
+                                    
+                                    return `
+                                    <div class="glass-item p-3 rounded-lg" oncontextmenu="App.showContextMenu(event, '${so.id}', 'so')">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <span class="font-bold text-white">${so.id} - ${customer.name}</span>
+                                                <div class="flex items-center space-x-2 my-1">
+                                                   ${deliveryImage ? '<span class="text-xs bg-blue-600 px-1.5 py-0.5 rounded-full">📷 Delivery</span>' : ''}
+                                                   ${paymentImage ? '<span class="text-xs bg-green-600 px-1.5 py-0.5 rounded-full">💲 Payment</span>' : ''}
+                                                </div>
+                                                <span class="text-xs text-secondary block">${so.items.map(i => `${i.name} (x${i.qty}) @ ${this.formatCurrency(i.price)}`).join(', ')}</span>
+                                            </div>
+                                            ${actionButton.replace(/{{id}}/g, so.id)}
+                                        </div>
+                                        ${so.status === 'Pending Delivery' ? `
+                                        <div class="flex space-x-2 mt-3 pt-2 border-t border-white/10">
+                                            <button onclick="App.openAttachmentModal('${so.id}', 'Delivery')" class="bg-white/10 text-xs px-3 py-1 rounded-full hover:bg-white/20 text-secondary">
+                                                ${deliveryImage ? 'View Delivery' : 'Attach Delivery'}
+                                            </button>
+                                            <button onclick="App.openAttachmentModal('${so.id}', 'Payment')" class="bg-white/10 text-xs px-3 py-1 rounded-full hover:bg-white/20 text-secondary">
+                                                ${paymentImage ? 'View Payment' : 'Attach Payment'}
+                                            </button>
+                                        </div>` : ''}
+                                    </div>
+                                `}).join('') : '<p class="text-secondary text-sm">No orders in this status.</p>'}
+                            </div>
+                        </div>
+                    `;
+                };
+
+                document.getElementById('content').innerHTML = `
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Sales & CRM</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <form id="pos-form" class="glass-panel p-4 sm:p-6 space-y-3">
+                            <h3 class="text-xl font-semibold text-white mb-3">⚡ Log In-Store Purchase (POS)</h3>
+                            <select id="pos-item" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary" onchange="App.autoFillPrice('pos-item', 'pos-price')">
+                                <option value="">Select Item (Finished Goods) *</option>
+                                ${sellableItems.map(i => `<option value="${i.id}" data-price="${i.sale_price || 0}">${i.name} (Stock: ${i.stock})</option>`).join('')}
+                            </select>
+                            <input type="number" id="pos-qty" value="1" min="1" placeholder="Quantity *" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <input type="number" id="pos-price" min="0" step="0.01" placeholder="Sale Price (₱) *" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <button type="button" onclick="App.logQuickSale()" class="bg-green-600 text-white font-bold w-full py-2 rounded-lg hover:bg-green-700 transition duration-150">Log Sale</button>
+                        </form>
+                        
+                        <form id="so-form" class="glass-panel p-4 sm:p-6 space-y-3">
+                            <h3 class="text-xl font-semibold text-white mb-3">🗓️ Create Planned Sales Order</h3>
+                            <select id="so-customer" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                                <option value="">Select Customer/Lead *</option>
+                                ${this.data.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                            </select>
+                            <select id="so-item" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary" onchange="App.autoFillPrice('so-item', 'so-price')">
+                                <option value="">Select Item (Finished Goods) *</option>
+                                ${sellableItems.map(i => `<option value="${i.id}" data-price="${i.sale_price || 0}">${i.name} (Stock: ${i.stock})</option>`).join('')}
+                            </select>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="number" id="so-qty" value="1" min="1" placeholder="Quantity *" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                                <input type="number" id="so-price" min="0" step="0.01" placeholder="Sale Price (₱) *" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            </div>
+                            <button type="button" onclick="App.createSO()" class="bg-primary text-white font-bold w-full py-2 rounded-lg hover:bg-indigo-700 transition duration-150">Generate Order</button>
+                        </form>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold text-white mb-4">Sales Order Status</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        ${renderSOList('Pending Delivery', s => s.status === 'Pending Delivery')}
+                        ${renderSOList('Completed', s => s.status !== 'Pending Delivery')}
+                    </div>
+                    
+                    <div class="glass-panel p-4 sm:p-6" id="customer-form">
+                        <h3 class="text-xl font-semibold text-white mb-3">Add Customer or Lead</h3>
+                        <form class="space-y-3">
+                            <input type="text" id="cust-name" placeholder="Hospital/Clinic Name *" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <input type="text" id="cust-contact" placeholder="Contact Person" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                            <select id="cust-status" class="block w-full p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                                <option value="Customer">Existing Customer</option>
+                                <option value="Lead">Potential Lead</option>
+                            </select>
+                            <button type="button" onclick="App.addCustomer()" class="bg-green-600 text-white font-bold w-full py-2 rounded-lg hover:bg-green-700 transition duration-150">Save Contact</button>
+                        </form>
+                    </div>
+                `;
+            },
+            
+            // --- Reports Logic (Sales) ---
+            setSalesSort(key) {
+                if (this.salesSortKey === key) { this.salesSortDirection = this.salesSortDirection === 'asc' ? 'desc' : 'asc'; }
+                else { this.salesSortKey = key; this.salesSortDirection = 'asc'; }
+                this.renderSalesDataView();
+            },
+            filterSalesData(event) {
+                this.salesFilterCustomer = event.target.value;
+                this.renderSalesDataView();
+            },
+            renderSalesDataView() {
+                const container = document.getElementById('sales-data-view');
+                if (!container) return;
+                let orders = (this.salesFilterCustomer !== 'all') ? this.data.salesOrders.filter(o => o.customer_id === this.salesFilterCustomer) : [...this.data.salesOrders];
+                const key = this.salesSortKey, dir = this.salesSortDirection === 'asc' ? 1 : -1;
+                orders.sort((a, b) => { 
+                    let valA, valB;
+                    if (key === 'date') { valA = new Date(a.date); valB = new Date(b.date); }
+                    else if (key === 'customer') { valA = a.customer_id; valB = b.customer_id; }
+                    else { valA = a.total; valB = b.total; }
+                    if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0;
+                });
+                const sortIcon = (k) => (this.salesSortKey === k) ? `<span class="sort-icon ${this.salesSortDirection === 'asc' ? 'sort-asc' : 'sort-desc'}"></span>` : '';
+                const customers = ['all', {id: 'CUST-0', name: 'In-Store / OTC Sale'}, ...this.data.customers];
+                container.innerHTML = `
+                    <h3 class="text-xl font-semibold text-white mb-4">Delivery & Sales Records</h3>
+                    <div class="mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 items-center">
+                        <label for="customer-filter" class="text-sm text-secondary flex-shrink-0">Filter by Customer:</label>
+                        <select id="customer-filter" onchange="App.filterSalesData(event)" class="p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary w-full sm:w-auto">
+                            ${customers.map(c => `<option value="${c.id || 'all'}" ${this.salesFilterCustomer === c.id ? 'selected' : ''}>${c.name || 'All Customers'}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="overflow-x-auto glass-panel rounded-xl">
+                        <table class="min-w-full divide-y divide-white/10 text-sm print-table">
+                            <thead class="bg-white/10 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-3 text-left font-medium cursor-pointer" onclick="App.setSalesSort('date')">Date ${sortIcon('date')}</th>
+                                    <th class="px-3 py-3 text-left font-medium cursor-pointer" onclick="App.setSalesSort('customer')">Customer ${sortIcon('customer')}</th>
+                                    <th class="px-3 py-3 text-left font-medium">Item & Status</th>
+                                    <th class="px-3 py-3 text-right font-medium cursor-pointer" onclick="App.setSalesSort('total')">Total ${sortIcon('total')}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                ${orders.length > 0 ? orders.map(order => `
+                                    <tr class="hover:bg-white/5 transition duration-100">
+                                        <td class="px-3 py-3 whitespace-nowrap">${order.date}</td>
+                                        <td class="px-3 py-3 whitespace-nowrap">${order.customer_name}</td>
+                                        <td class="px-3 py-3">
+                                            ${order.items.map(item => `${item.name} (x${item.qty})`).join('<br>')}
+                                            <span class="text-xs font-semibold p-1 rounded-full ${order.status.includes('Completed') || order.status.includes('Billed') ? 'bg-green-700' : 'bg-red-700'} mt-1 inline-block">${order.status}</span>
+                                        </td>
+                                        <td class="px-3 py-3 whitespace-nowrap text-right font-bold text-green-400">${this.formatCurrency(order.total)}</td>
+                                    </tr>
+                                `).join('') : `<tr><td colspan="4" class="text-center py-6 text-secondary">No sales orders match.</td></tr>`}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            },
+            
+            // --- Reports Logic (Production) ---
+            setProdLogSort(key) {
+                if (this.prodLogSortKey === key) { this.prodLogSortDirection = this.prodLogSortDirection === 'asc' ? 'desc' : 'asc'; }
+                else { this.prodLogSortKey = key; this.prodLogSortDirection = 'asc'; }
+                this.renderProductionLogView();
+            },
+            renderProductionLogView() {
+                const container = document.getElementById('production-log-view');
+                if (!container) return;
+                let log = [...this.data.manufacturingOrders];
+                const key = this.prodLogSortKey, dir = this.prodLogSortDirection === 'asc' ? 1 : -1;
+                log.sort((a, b) => { 
+                    let valA, valB;
+                    if (key === 'date') { valA = new Date(a.date); valB = new Date(b.date); }
+                    else if (key === 'worker') { valA = a.workerName; valB = b.workerName; }
+                    else if (key === 'quantity') { valA = a.qty; valB = b.qty; }
+                    else { valA = a.productName; valB = b.productName; }
+                    if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0;
+                });
+                const sortIcon = (k) => (this.prodLogSortKey === k) ? `<span class="sort-icon ${this.prodLogSortDirection === 'asc' ? 'sort-asc' : 'sort-desc'}"></span>` : '';
+                container.innerHTML = `
+                    <h3 class="text-xl font-semibold text-white mb-4">Production Log (All MOs)</h3>
+                    <div class="overflow-x-auto glass-panel rounded-xl">
+                        <table class="min-w-full divide-y divide-white/10 text-sm print-table">
+                            <thead class="bg-white/10 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-3 text-left font-medium cursor-pointer" onclick="App.setProdLogSort('date')">Date ${sortIcon('date')}</th>
+                                    <th class="px-3 py-3 text-left font-medium cursor-pointer" onclick="App.setProdLogSort('worker')">Worker ${sortIcon('worker')}</th>
+                                    <th class="px-3 py-3 text-left font-medium cursor-pointer" onclick="App.setProdLogSort('product')">Product ${sortIcon('product')}</th>
+                                    <th class="px-3 py-3 text-left font-medium">Status</th>
+                                    <th class="px-3 py-3 text-right font-medium cursor-pointer" onclick="App.setProdLogSort('quantity')">Quantity ${sortIcon('quantity')}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                ${log.length > 0 ? log.map(l => {
+                                    const statusColor = l.status === 'Completed' ? 'text-green-400' : (l.status === 'In Progress' ? 'text-yellow-400' : 'text-secondary');
+                                    return `
+                                    <tr class="hover:bg-white/5 transition duration-100">
+                                        <td class="px-3 py-3 whitespace-nowrap">${l.date}</td>
+                                        <td class="px-3 py-3 whitespace-nowrap">${l.workerName}</td>
+                                        <td class="px-3 py-3 whitespace-nowrap">${l.productName}</td>
+                                        <td class="px-3 py-3 whitespace-nowrap font-medium ${statusColor}">${l.status}</td>
+                                        <td class="px-3 py-3 whitespace-nowrap text-right font-bold">${l.qty}</td>
+                                    </tr>
+                                `}).join('') : `<tr><td colspan="5" class="text-center py-6 text-secondary">No production runs.</td></tr>`}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            },
+
+            // --- Reports Logic (On-Demand) ---
+            generateOnDemandReport() {
+                const period = document.getElementById('report-period').value;
+                const now = new Date();
+                let startDate, endDate = new Date(now);
+                let title = '';
+
+                endDate.setHours(23, 59, 59, 999);
+
+                switch (period) {
+                    case 'today':
+                        startDate = new Date(now);
+                        startDate.setHours(0, 0, 0, 0);
+                        title = `Financial Report for Today (${now.toLocaleDateString('en-US')})`;
+                        break;
+                    case 'week':
+                        startDate = new Date(now.setDate(now.getDate() - now.getDay()));
+                        startDate.setHours(0, 0, 0, 0);
+                        title = `Weekly Financial Report (Starting ${startDate.toLocaleDateString('en-US')})`;
+                        break;
+                    case 'month':
+                        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                        startDate.setHours(0, 0, 0, 0);
+                        title = `Monthly Financial Report (${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })})`;
+                        break;
+                    case 'quarter':
+                        const quarter = Math.floor(now.getMonth() / 3);
+                        startDate = new Date(now.getFullYear(), quarter * 3, 1);
+                        startDate.setHours(0, 0, 0, 0);
+                        title = `Quarterly Report (Q${quarter + 1} ${now.getFullYear()})`;
+                        break;
+                    case 'year':
+                        startDate = new Date(now.getFullYear(), 0, 1);
+                        startDate.setHours(0, 0, 0, 0);
+                        title = `Yearly Financial Report (${now.getFullYear()})`;
+                        break;
+                }
+                
+                const startStr = startDate.toISOString().split('T')[0];
+                const endStr = endDate.toISOString().split('T')[0];
+
+                const relevantSales = this.data.salesOrders.filter(o => o.date >= startStr && o.date <= endStr && o.status !== 'Pending Delivery');
+                const relevantExpenses = this.data.expenses.filter(e => e.date >= startStr && e.date <= endStr);
+                const relevantProduction = this.data.manufacturingOrders.filter(m => m.date >= startStr && m.date <= endStr && m.status === 'Completed');
+
+                const totalRevenue = relevantSales.reduce((sum, o) => sum + o.total, 0);
+                const totalExpenses = relevantExpenses.reduce((sum, e) => sum + e.amount, 0);
+                const netProfit = totalRevenue - totalExpenses;
+                
+                const workerCounts = relevantProduction.reduce((acc, mo) => {
+                    acc[mo.workerName] = (acc[mo.workerName] || 0) + mo.qty;
+                    return acc;
+                }, {});
+                const topWorker = Object.entries(workerCounts).sort((a, b) => b[1] - a[1])[0];
+
+                const productCounts = relevantSales.flatMap(o => o.items).reduce((acc, item) => {
+                    acc[item.name] = (acc[item.name] || 0) + item.qty;
+                    return acc;
+                }, {});
+                const topProduct = Object.entries(productCounts).sort((a, b) => b[1] - a[1])[0];
+
+                const report = {
+                    title: title,
+                    period: `${startStr} to ${endStr}`,
+                    totalRevenue: totalRevenue,
+                    totalExpenses: totalExpenses,
+                    netProfit: netProfit,
+                    topWorker: topWorker ? `${topWorker[0]} (${topWorker[1]} items)` : 'N/A',
+                    topProduct: topProduct ? `${topProduct[0]} (${topProduct[1]} units sold)` : 'N/A'
+                };
+                
+                this.generatedReport = report; // Save for printing
+                
+                const container = document.getElementById('report-output');
+                container.innerHTML = `
+                    <h4 class="text-lg font-semibold text-white mb-4">${report.title}</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                        <div class="glass-item p-4 rounded-lg">
+                            <p class="text-sm text-secondary">Total Revenue</p>
+                            <p class="text-2xl font-bold text-green-400">${this.formatCurrency(report.totalRevenue)}</p>
+                        </div>
+                        <div class="glass-item p-4 rounded-lg">
+                            <p class="text-sm text-secondary">Total Expenses</p>
+                            <p class="text-2xl font-bold text-red-400">${this.formatCurrency(report.totalExpenses)}</p>
+                        </div>
+                        <div class="glass-item p-4 rounded-lg">
+                            <p class="text-sm text-secondary">Net Profit</p>
+                            <p class="text-2xl font-bold ${report.netProfit >= 0 ? 'text-blue-400' : 'text-red-400'}">${this.formatCurrency(report.netProfit)}</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="glass-item p-4 rounded-lg">
+                            <p class="text-sm text-secondary">Best-Selling Item</p>
+                            <p class="text-lg font-semibold text-white">${report.topProduct}</p>
+                        </div>
+                        <div class="glass-item p-4 rounded-lg">
+                            <p class="text-sm text-secondary">Most Productive Worker</p>
+                            <p class="text-lg font-semibold text-white">${report.topWorker}</p>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('print-report-btn').disabled = false;
+            },
+            
+            printGeneratedReport() {
+                if (!this.generatedReport) {
+                    return this.showMessage('Please generate a report first.');
+                }
+                const report = this.generatedReport;
+                const printContent = `
+                    <div class="p-8">
+                        <h1 class="text-3xl font-bold mb-2">Bebang's Business Management System</h1>
+                        <h2 class="text-2xl font-semibold mb-4">${report.title}</h2>
+                        <p class="mb-6">Report Period: ${report.period}</p>
+                        <table class="w-full border-collapse border border-gray-400 print-table mb-8">
+                            <thead class="bg-gray-200">
+                                <tr>
+                                    <th class="border p-2 text-left">Metric</th>
+                                    <th class="border p-2 text-right">Amount (PHP)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="border p-2">Total Revenue</td>
+                                    <td class="border p-2 text-right">${this.formatCurrency(report.totalRevenue)}</td>
+                                </tr>
+                                <tr>
+                                    <td class="border p-2">Total Expenses</td>
+                                    <td class="border p-2 text-right">${this.formatCurrency(report.totalExpenses)}</td>
+                                </tr>
+                                <tr>
+                                    <td class="border p-2"><strong>Net Profit</strong></td>
+                                    <td class="border p-2 text-right"><strong>${this.formatCurrency(report.netProfit)}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h2 class="text-2xl font-semibold mb-4">Top Performers</h2>
+                        <ul class="space-y-2">
+                            <li><strong>Best-Selling Item:</strong> ${report.topProduct}</li>
+                            <li><strong>Most Productive Worker:</strong> ${report.topWorker}</li>
+                        </ul>
+                    </div>
+                `;
+                const printArea = document.getElementById('print-area');
+                printArea.innerHTML = printContent;
+                window.print();
+            },
+            
+            renderReports() {
+                document.getElementById('content').innerHTML = `
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Reports & Settings</h2>
+                    
+                    <div id="reports-generator-card" class="glass-panel p-4 sm:p-6 mb-8">
+                        <h3 class="text-xl font-semibold text-white mb-4">Generate Financial Report</h3>
+                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
+                            <select id="report-period" class="flex-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                                <option value="today">Today's Report</option>
+                                <option value="week">This Week's Report</option>
+                                <option value="month">This Month's Report</option>
+                                <option value="quarter">This Quarter's Report</option>
+                                <option value="year">This Year's Report</option>
+                            </select>
+                            <button onclick="App.generateOnDemandReport()" class="bg-primary text-white font-bold px-5 py-2 rounded-lg hover:bg-indigo-700 transition duration-150">Generate</button>
+                            <button id="print-report-btn" onclick="App.printGeneratedReport()" class="bg-blue-600 text-white font-bold px-5 py-2 rounded-lg hover:bg-blue-700 transition duration-150 disabled:opacity-50" disabled>Print Report</button>
+                        </div>
+                        <div id="report-output" class="mt-4">
+                            </div>
+                    </div>
+                    
+                    <div id="production-log-view" class="mb-8"></div>
+                    <div id="sales-data-view" class="mb-8"></div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div id="worker-management-card" class="glass-panel p-4 sm:p-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Worker Management</h3>
+                            <div class="flex space-x-2 mb-4">
+                                <input type="text" id="worker-name" placeholder="Add new worker name..." class="flex-1 p-2 rounded-lg bg-white/10 border-white/20 focus:ring-primary focus:border-primary">
+                                <button onclick="App.addWorker()" class="bg-primary text-white font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150">Add</button>
+                            </div>
+                            <div class="space-y-2 max-h-40 overflow-y-auto">
+                                ${this.data.workers.map(w => `
+                                    <div class="glass-item p-2 rounded-lg flex justify-between items-center">
+                                        <span class="text-white">${w.name}</span>
+                                        <button onclick="App.deleteWorker('${w.id}')" class="text-red-500 hover:text-red-400 text-lg">&times;</button>
+                                    </div>
+                                `).join('')}
+                                ${this.data.workers.length === 0 ? '<p class="text-secondary text-sm">No workers added yet.</p>' : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="glass-panel p-4 sm:p-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Theme Settings</h3>
+                            <div class="flex items-center space-x-4">
+                                <label class="text-sm text-secondary">Current Theme: <span class="font-bold text-primary">${this.data.theme.charAt(0).toUpperCase() + this.data.theme.slice(1)} Mode</span></label>
+                                <button onclick="App.setTheme('dark')" class="px-3 py-1 rounded-lg text-sm transition ${this.data.theme === 'dark' ? 'bg-primary text-white' : 'bg-white/10 text-secondary hover:bg-white/20'}">Dark</button>
+                                <button onclick="App.setTheme('light')" class="px-3 py-1 rounded-lg text-sm transition ${this.data.theme === 'light' ? 'bg-primary text-white' : 'bg-white/10 text-secondary hover:bg-white/20'}">Light</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="backup-card" class="glass-panel p-4 sm:p-6">
+                        <h3 class="text-xl font-semibold text-white mb-4">Data Backup & Restore</h3>
+                        <p class="text-sm text-red-300 mb-4">**Mandatory Backups:** Your data is only stored in this browser. Export it regularly.</p>
+                        
+                        <div class="mb-4">
+                            <label class="text-sm text-secondary">Local Storage Usage:</label>
+                            <div class="w-full bg-white/10 rounded-full h-2.5 mt-1">
+                                <div id="storage-bar" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                            <p id="storage-text" class="text-xs text-secondary text-right mt-1">Calculating...</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <button onclick="App.exportData()" class="bg-accent text-white font-bold w-full py-2 rounded-lg hover:bg-yellow-600 transition duration-150">Export Data (JSON)</button>
+                            <input type="file" id="import-file" accept=".json" class="hidden" onchange="App.importData(event)">
+                            <button onclick="document.getElementById('import-file').click()" class="bg-gray-500 text-white font-bold w-full py-2 rounded-lg hover:bg-gray-600 transition duration-150">Restore Data (JSON)</button>
+                        </div>
+                        <div class="mt-6 border-t border-red-500/30 pt-4">
+                            <button id="factory-reset-button" onclick="App.factoryReset()" class="bg-red-700 text-white font-bold w-full py-2 rounded-lg hover:bg-red-800 transition duration-150 text-sm">Factory Reset (Delete All Data)</button>
+                            <p class="text-xs text-secondary text-center mt-2">Use this if you want to clear everything and start over from zero.</p>
+                        </div>
+                    </div>
+                `;
+                this.renderProductionLogView();
+                this.renderSalesDataView();
+                this.updateStorageUsage();
+            },
+            
+            async updateStorageUsage() {
+                if ('storage' in navigator && 'estimate' in navigator.storage) {
+                    try {
+                        const { usage, quota } = await navigator.storage.estimate();
+                        const usageMB = (usage / 1024 / 1024).toFixed(2);
+                        const quotaGB = (quota / 1024 / 1024 / 1024).toFixed(2); // Show as GB
+                        const percent = ((usage / quota) * 100).toFixed(2);
+                        
+                        const storageBar = document.getElementById('storage-bar');
+                        const storageText = document.getElementById('storage-text');
+                        
+                        if (storageBar) storageBar.style.width = `${percent}%`;
+                        if (storageText) storageText.textContent = `Used ${usageMB} MB of ${quotaGB} GB (${percent}%)`;
+                        
+                    } catch (error) {
+                        console.error('Could not estimate storage:', error);
+                        const storageText = document.getElementById('storage-text');
+                        if (storageText) storageText.textContent = 'Could not estimate storage.';
+                    }
+                } else {
+                    const storageText = document.getElementById('storage-text');
+                    if (storageText) storageText.textContent = 'Storage estimation not supported.';
+                }
+            },
+
+            // --- Reporting & Printing Logic ---
+            generatePrintReport(type) {
+                let reportContent = '';
+                const date = new Date().toLocaleDateString();
+
+                if (type === 'financial') {
+                    const totalSales = this.data.salesOrders.reduce((sum, o) => sum + o.total, 0);
+                    const totalExpenses = this.data.expenses.reduce((sum, e) => sum + e.amount, 0);
+                    const netProfit = totalSales - totalExpenses;
+                    reportContent = `
+                        <div class="p-8">
+                            <h1 class="text-3xl font-bold mb-6">Financial Summary Report (YTD)</h1>
+                            <p class="mb-6">Date Generated: ${date}</p>
+                            <h2 class="text-2xl font-semibold mb-4">Summary</h2>
+                            <ul class="space-y-2 mb-8">
+                                <li><strong>Total Sales YTD:</strong> <span class="text-green-600">${this.formatCurrency(totalSales)}</span></li>
+                                <li><strong>Total Expenses YTD:</strong> <span class="text-red-600">${this.formatCurrency(totalExpenses)}</span></li>
+                                <li><strong>Net Profit YTD:</strong> <span class="${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}">${this.formatCurrency(netProfit)}</span></li>
+                            </ul>
+                            <h2 class="text-2xl font-semibold mb-4">Detailed Expenses</h2>
+                            <table class="w-full border-collapse border border-gray-400 print-table">
+                                <thead class="bg-gray-200">
+                                    <tr><th class="border p-2 text-left">Date</th><th class="border p-2 text-left">Category</th><th class="border p-2 text-left">Description</th><th class="border p-2 text-right">Amount</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${this.data.expenses.map(e => `<tr><td class="border p-2">${e.date}</td><td class="border p-2">${e.category}</td><td class="border p-2">${e.description}</td><td class="border p-2 text-right">${this.formatCurrency(e.amount)}</td></tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                } else if (type === 'inventory') {
+                    const totalAssetValue = this.calculateTotalAssetValue();
+                    reportContent = `
+                        <div class="p-8">
+                            <h1 class="text-3xl font-bold mb-6">Inventory Valuation Report</h1>
+                            <p class="mb-6">Date Generated: ${date}</p>
+                            <p class="text-2xl font-bold mb-8">Total Asset Value: <span class="text-accent-600">${this.formatCurrency(totalAssetValue)}</span></p>
+                            <table class="w-full border-collapse border border-gray-400 print-table">
+                                <thead class="bg-gray-200">
+                                    <tr><th class="border p-2 text-left">Item Name</th><th class="border p-2 text-left">Type</th><th class="border p-2 text-right">Stock</th><th class="border p-2 text-right">Value/Unit (₱)</th><th class="border p-2 text-right">Total Value (₱)</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${this.data.inventory.map(i => {
+                                        const unitValue = i.sale_price || i.unit_cost || 0;
+                                        const totalValue = i.stock * unitValue;
+                                        return `<tr><td class="border p-2">${i.name}</td><td class="border p-2">${i.type}</td><td class="border p-2 text-right">${i.stock}</td><td class="border p-2 text-right">${this.formatCurrency(unitValue)}</td><td class="border p-2 text-right">${this.formatCurrency(totalValue)}</td></tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                } else if (type === 'sales_data') {
+                    const filteredOrders = [...this.data.salesOrders].sort((a,b) => new Date(b.date) - new Date(a.date));
+                    reportContent = `
+                        <div class="p-8">
+                            <h1 class="text-3xl font-bold mb-6">Sales and Delivery Records</h1>
+                            <p class="mb-6">Date Generated: ${date}</p>
+                            <table class="w-full border-collapse border border-gray-400 print-table">
+                                <thead class="bg-gray-200">
+                                    <tr><th class="border p-2 text-left">Date</th><th class="border p-2 text-left">Customer</th><th class="border p-2 text-left">Item(s)</th><th class="border p-2 text-right">Total (₱)</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${filteredOrders.map(order => `
+                                        <tr>
+                                            <td class="border p-2">${order.date}</td>
+                                            <td class="border p-2">${order.customer_name}</td>
+                                            <td class="border p-2">${order.items.map(item => `${item.name} (x${item.qty})`).join(', ')}</td>
+                                            <td class="border p-2 text-right">${this.formatCurrency(order.total)}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+                const printArea = document.getElementById('print-area');
+                printArea.innerHTML = reportContent;
+                window.print();
+            },
+            exportData() {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `beb_biz_backup_v1_${new Date().toISOString().split('T')[0]}.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                this.showMessage('Data exported successfully! Check your downloads folder.');
+            },
+            async importData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (importedData.inventory && importedData.customers) { 
+                            this.data = { ...initialData, ...importedData };
+                            if (!this.data.purchaseOrders) this.data.purchaseOrders = initialData.purchaseOrders;
+                            if (!this.data.manufacturingOrders) this.data.manufacturingOrders = initialData.manufacturingOrders;
+                            if (!this.data.salesOrders) this.data.salesOrders = importedData.orders || initialData.salesOrders;
+                            if (!this.data.theme) this.data.theme = initialData.theme;
+                            if (!this.data.workers) this.data.workers = initialData.workers;
+                            if (!this.data.manualAdjustments) this.data.manualAdjustments = initialData.manualAdjustments;
+                            await this.saveData();
+                            this.showMessage('Data restored successfully! App reloading.');
+                            this.setTheme(this.data.theme);
+                            this.render('dashboard');
+                        } else {
+                            this.showMessage('Invalid backup file structure.');
+                        }
+                    } catch (error) {
+                        this.showMessage('Error reading file. Ensure it is a valid JSON backup.');
+                        console.error('Import error:', error);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = null;
+            },
+            
+            // --- Chart and UI functions ---
+            renderSalesChart() {
+                const salesByMonth = Array(6).fill(0);
+                const months = [];
+                const now = new Date();
+                for (let i = 5; i >= 0; i--) {
+                    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    months.push(monthDate.toLocaleString('en-US', { month: 'short' }));
+                    const yearMonth = monthDate.toISOString().substring(0, 7);
+                    const monthlySales = this.data.salesOrders
+                        .filter(o => o.date.startsWith(yearMonth))
+                        .reduce((sum, o) => sum + o.total, 0);
+                    salesByMonth[5 - i] = monthlySales;
+                }
+                const maxSales = Math.max(...salesByMonth, 1000); 
+                return `
+                    <div class="glass-panel p-4 sm:p-6">
+                        <h3 class="text-xl font-semibold text-white mb-4">Last 6 Months Sales (₱)</h3>
+                        <div class="flex items-end h-40 space-x-2 sm:space-x-4">
+                            ${salesByMonth.map((sales, index) => {
+                                const heightPercentage = (sales / maxSales) * 100;
+                                return `
+                                    <div class="flex flex-col items-center flex-1 h-full">
+                                        <div class="chart-bar w-full" style="height: ${heightPercentage}%">
+                                            <span class="chart-bar-value">${this.formatCurrency(sales).replace('₱', '')}</span>
+                                        </div>
+                                        <div class="text-xs mt-1 text-secondary">${months[index]}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            },
+            renderProfitChart() {
+                const today = new Date();
+                const weeklyProfit = Array(8).fill(0);
+                const weeks = [];
+
+                for (let i = 7; i >= 0; i--) {
+                    const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() - (i * 7));
+                    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+                    weeks.push(`Wk ${weekStart.getDate()}/${weekStart.getMonth()+1}`);
+                    
+                    const weekStartDateStr = weekStart.toISOString().split('T')[0];
+                    const weekEndDateStr = weekEnd.toISOString().split('T')[0];
+                    
+                    const sales = this.data.salesOrders
+                        .filter(o => o.date >= weekStartDateStr && o.date <= weekEndDateStr)
+                        .reduce((sum, o) => sum + o.total, 0);
+                    const expenses = this.data.expenses
+                        .filter(e => e.date >= weekStartDateStr && e.date <= weekEndDateStr)
+                        .reduce((sum, e) => sum + e.amount, 0);
+                        
+                    weeklyProfit[7 - i] = sales - expenses;
+                }
+
+                const maxProfit = Math.max(...weeklyProfit, 1000);
+                const minProfit = Math.min(...weeklyProfit, 0);
+
+                return `
+                    <div class="glass-panel p-4 sm:p-6">
+                        <h3 class="text-xl font-semibold text-white mb-4">Last 8 Weeks Net Profit (₱)</h3>
+                        <div class="flex items-end h-40 space-x-2 sm:space-x-4">
+                            ${weeklyProfit.map((profit, index) => {
+                                const heightPercentage = profit > 0 ? (profit / maxProfit) * 100 : 0;
+                                const negHeightPercentage = profit < 0 ? (profit / minProfit) * 100 : 0;
+                                
+                                return `
+                                    <div class="flex flex-col items-center flex-1 h-full">
+                                        ${profit >= 0 ? 
+                                        `<div class="chart-bar w-full bg-blue-500" style="height: ${heightPercentage}%">
+                                            <span class="chart-bar-value">${this.formatCurrency(profit).replace('₱', '')}</span>
+                                        </div>` : 
+                                        `<div class="chart-bar w-full bg-red-500 self-start" style="height: ${negHeightPercentage}%">
+                                             <span class="chart-bar-value" style="top: auto; bottom: -16px;">${this.formatCurrency(profit).replace('₱', '')}</span>
+                                        </div>`}
+                                        <div class="text-xs mt-1 text-secondary">${weeks[index]}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            },
+            showContextMenu(e, targetId, type) {
+                e.preventDefault();
+                this.contextTargetId = { id: targetId, type: type };
+                const menu = document.getElementById('context-menu');
+                menu.style.top = `${e.clientY}px`;
+                menu.style.left = `${e.clientX}px`;
+                menu.classList.remove('hidden');
+                menu.classList.add('flex');
+            },
+            hideContextMenu() {
+                document.getElementById('context-menu').classList.remove('flex');
+                document.getElementById('context-menu').classList.add('hidden');
+                this.contextTargetId = null;
+            },
+            async handleContextMenuAction(action) {
+                const target = this.contextTargetId;
+                this.hideContextMenu();
+                if (!target) return;
+
+                if (action === 'edit') {
+                    this.showMessage('Edit is not yet available. Please delete and re-create the item to fix mistakes.');
+                }
+                
+                if (action === 'delete') {
+                    const confirmed = confirm(`Are you sure you want to delete item ${target.id}?\n\nThis action cannot be undone.`);
+                    if (confirmed) {
+                        let deleted = false;
+                        if (target.id.startsWith('PO-')) {
+                            this.data.purchaseOrders = this.data.purchaseOrders.filter(i => i.id !== target.id);
+                            deleted = true;
+                        } else if (target.id.startsWith('MO-')) {
+                            this.data.manufacturingOrders = this.data.manufacturingOrders.filter(i => i.id !== target.id);
+                            deleted = true;
+                        } else if (target.id.startsWith('SO-')) {
+                            this.data.salesOrders = this.data.salesOrders.filter(i => i.id !== target.id);
+                            deleted = true;
+                        }
+                        
+                        if (deleted) {
+                            this.showMessage(`Item ${target.id} was deleted.`);
+                            await this.saveAndRerender();
+                        }
+                    }
+                }
+            },
+            
+            autoFillPrice(selectId, priceId) {
+                const select = document.getElementById(selectId);
+                const priceInput = document.getElementById(priceId);
+                const selectedOption = select.options[select.selectedIndex];
+                const price = selectedOption.getAttribute('data-price');
+                
+                if (price) {
+                    priceInput.value = parseFloat(price).toFixed(2);
+                } else {
+                    priceInput.value = '';
+                }
+            },
+
+            // --- Router / View Management ---
+            render(tabName, options = {}) {
+                if (this.isRendering) return;
+                this.isRendering = true;
+                document.getElementById('content').style.opacity = 0;
+                setTimeout(() => {
+                    this.currentTab = tabName;
+                    this.unhighlightElement(); 
+                    document.querySelectorAll('.nav-button').forEach(button => {
+                        const isSelected = button.getAttribute('data-tab') === tabName;
+                        button.classList.toggle('bg-white/20', isSelected);
+                        button.classList.toggle('text-white', isSelected);
+                        button.classList.toggle('text-secondary', !isSelected);
+                        button.classList.toggle('glass-item', !isSelected);
+                        if (isSelected) button.classList.add('bg-white/20');
+                    });
+                    switch (tabName) {
+                        case 'procurement': this.renderProcurement(); break;
+                        case 'inventory': this.renderInventory(); break;
+                        case 'manufacturing': this.renderManufacturing(); break;
+                        case 'sales': this.renderSales(); break;
+                        case 'reports': this.renderReports(); break;
+                        case 'dashboard': default: this.renderDashboard(); break;
+                    }
+                    document.getElementById('content').style.opacity = 1;
+                    this.isRendering = false;
+                }, options.skipAnimation ? 0 : 150);
+            },
+
+            setupEventListeners() {
+                const sidebar = document.getElementById('sidebar');
+                const newSidebar = sidebar.cloneNode(true);
+                sidebar.parentNode.replaceChild(newSidebar, sidebar);
+                newSidebar.addEventListener('click', (e) => {
+                    const button = e.target.closest('.nav-button');
+                    if (button) this.render(button.getAttribute('data-tab'));
+                });
+                document.addEventListener('click', (e) => {
+                    const contextMenu = document.getElementById('context-menu');
+                    if (contextMenu && !contextMenu.contains(e.target)) this.hideContextMenu();
+                });
+                document.onkeydown = (e) => {
+                    const metaKey = e.metaKey || e.ctrlKey;
+                    if (metaKey && e.key >= '1' && e.key <= '6') {
+                        e.preventDefault();
+                        const tabNames = ['dashboard', 'procurement', 'inventory', 'manufacturing', 'sales', 'reports'];
+                        this.render(tabNames[parseInt(e.key) - 1]);
+                    }
+                    if (document.getElementById('tour-modal').classList.contains('visible')) {
+                        if (e.key === 'Escape') this.closeTour();
+                        else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); this.nextTourStep(); }
+                        else if (e.key === 'ArrowLeft') { e.preventDefault(); this.prevTourStep(); }
+                    }
+                };
+            }
+        };
+
+        window.App = App;
+
+        // --- Initialization ---
+        window.onload = () => {
+            App.defineTourSteps();
+            App.renderSidebar();
+            App.setupEventListeners();
+            App.initDB();
+        };
+    </script>
+</body>
+</html>
