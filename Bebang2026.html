@@ -1187,30 +1187,42 @@ Check your Browserslist config to be sure that your targets are set up correctly
                     const docRef = firestoreDb.collection('business').doc('main');
                     this.firestoreDocRef = docRef;
                     this._firstSnapshot = true;
-
-                    docRef.onSnapshot(async (snap) => {
-                        if (this._firstSnapshot) {
-                            this._firstSnapshot = false;
-                            if (!snap.exists) {
-                                await this.seedSharedDatabase(docRef, localSnapshot, localImages);
-                                return; // our own set() above re-triggers this same listener with exists:true
-                            }
-                        }
-                        // If the user is mid-typing in a form, don't yank it away from under them --
-                        // just remember the update and let the NEXT render (their own next action)
-                        // pick up the fresh data, via the check at the top of render().
-                        this._latestCloudData = snap.data();
-                        const active = document.activeElement;
-                        const isEditing = active && ['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName) && document.getElementById('content')?.contains(active);
-                        if (!isEditing) this.render(this.currentTab || 'dashboard', { skipAnimation: true });
-                    }, (error) => {
-                        console.error('Firestore sync error:', error);
-                        this.showMessage('Lost connection to the shared database. Showing the last synced copy.');
-                    });
+                    this.subscribeToSharedData(docRef, localSnapshot, localImages);
                 } catch (error) {
                     console.error('Error initializing shared database:', error);
                     this.showMessage('Could not start the shared database. Please reload.');
                 }
+            },
+            // Subscribes to the shared document, with retry-with-backoff on 'permission-denied'.
+            // That specific error, right after sign-in, is almost always a brief race between
+            // Auth confirming the user and Firestore's credential provider picking up the new
+            // token (observed directly while testing this against a local emulator) -- not a
+            // real, permanent rejection. Retrying a few times lets it self-heal silently instead
+            // of surfacing a scary error or, worse, leaving the listener dead after one hiccup.
+            subscribeToSharedData(docRef, localSnapshot, localImages, retryCount = 0) {
+                docRef.onSnapshot(async (snap) => {
+                    if (this._firstSnapshot) {
+                        this._firstSnapshot = false;
+                        if (!snap.exists) {
+                            await this.seedSharedDatabase(docRef, localSnapshot, localImages);
+                            return; // our own set() above re-triggers this same listener with exists:true
+                        }
+                    }
+                    // If the user is mid-typing in a form, don't yank it away from under them --
+                    // just remember the update and let the NEXT render (their own next action)
+                    // pick up the fresh data, via the check at the top of render().
+                    this._latestCloudData = snap.data();
+                    const active = document.activeElement;
+                    const isEditing = active && ['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName) && document.getElementById('content')?.contains(active);
+                    if (!isEditing) this.render(this.currentTab || 'dashboard', { skipAnimation: true });
+                }, (error) => {
+                    if (error.code === 'permission-denied' && retryCount < 4) {
+                        setTimeout(() => this.subscribeToSharedData(docRef, localSnapshot, localImages, retryCount + 1), 400 * (retryCount + 1));
+                        return;
+                    }
+                    console.error('Firestore sync error:', error);
+                    this.showMessage('Lost connection to the shared database. Showing the last synced copy.');
+                });
             },
             // Local-only fallback, identical to how this app worked before sync existed. Used
             // automatically whenever firebaseConfig above still has its placeholder values.
@@ -4024,7 +4036,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
             }
             document.getElementById('auth-config-warning').classList.add('hidden');
             let booted = false;
-            auth.onAuthStateChanged((user) => {
+            auth.onAuthStateChanged(async (user) => {
                 const authScreen = document.getElementById('auth-screen');
                 const appEl = document.getElementById('app');
                 const pill = document.getElementById('session-status-pill');
@@ -4032,7 +4044,15 @@ Check your Browserslist config to be sure that your targets are set up correctly
                     authScreen.classList.add('hidden');
                     appEl.classList.remove('hidden');
                     if (pill) pill.textContent = user.email;
-                    if (!booted) { booted = true; bootApp(); }
+                    if (!booted) {
+                        booted = true;
+                        // Make sure the ID token has actually finished propagating to Firestore's
+                        // credential provider before subscribing -- without this, the very first
+                        // onSnapshot call can race ahead of auth and get one PERMISSION_DENIED
+                        // rejection from Security Rules before self-healing a moment later.
+                        try { await user.getIdToken(); } catch (e) { /* proceed anyway; initDB will surface any real problem */ }
+                        bootApp();
+                    }
                 } else {
                     authScreen.classList.remove('hidden');
                     appEl.classList.add('hidden');
