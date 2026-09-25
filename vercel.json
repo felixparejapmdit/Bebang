@@ -1,5 +1,12 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/Bebang2026.html" }
+  "headers": [
+    {
+      "source": "/(sw.js|js/config/version.js)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+    }
   ]
 }
