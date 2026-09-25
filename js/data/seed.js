@@ -86,6 +86,7 @@ const initialData = {
     workers: [],
     manualAdjustments: [],
     payrollPayments: [],
+    suppliers: [],
     settings: structuredClone(DEFAULT_SETTINGS)
 };
 
@@ -93,7 +94,7 @@ const emptyData = {
     inventory: [], customers: [], salesOrders: [], expenses: [],
     imageAttachments: [], theme: 'dark', purchaseOrders: [],
     manufacturingOrders: [], issuances: [], workers: [], manualAdjustments: [],
-    payrollPayments: [], costingRows: null, rawMaterialPriceRows: null,
+    payrollPayments: [], suppliers: [], costingRows: null, rawMaterialPriceRows: null,
     settings: structuredClone(DEFAULT_SETTINGS)
 };
 

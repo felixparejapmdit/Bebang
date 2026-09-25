@@ -31,6 +31,11 @@ class Utils {
     }
 
     /** ₱1,234.50 — pass precise=true for per-piece costs that need a 3rd decimal (₱0.006). */
+    static formatDateTime(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return isNaN(d) ? '—' : d.toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
     static formatCurrency(value, precise = false) { return (precise ? Utils._currency3 : Utils._currency).format(Number(value) || 0); }
     static formatNumber(value, maxDecimals = 2) {
         return (Number(value) || 0).toLocaleString('en-PH', { maximumFractionDigits: maxDecimals });

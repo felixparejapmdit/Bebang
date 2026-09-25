@@ -21,10 +21,10 @@ class BasePage {
     setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
 
     workerSelectOptions() {
-        return this.data.workers.map(w => `<option value="${Utils.esc(w.name)}">${Utils.esc(w.name)}</option>`).join('');
+        return this.data.workers.filter(w => w.active !== false).map(w => `<option value="${Utils.esc(w.name)}">${Utils.esc(w.name)}</option>`).join('');
     }
     itemLabel(i) { return `${i.name} (Stock: ${Utils.formatNumber(i.stock, 4)}${i.units ? ' ' + i.units : ''})`; }
     noWorkersHint() {
-        return this.data.workers.length ? '' : `<p class="text-xs text-accent col-span-full">No workers yet — <button type="button" class="underline font-semibold" onclick="App.records.create('worker')">add a worker</button> first (or in Settings → Worker Management).</p>`;
+        return this.data.workers.some(w => w.active !== false) ? '' : `<p class="text-xs text-accent col-span-full">No workers yet — <button type="button" class="underline font-semibold" onclick="App.records.create('worker')">add a worker</button> first (or in Settings → Workers).</p>`;
     }
 }

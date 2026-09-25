@@ -312,3 +312,50 @@ All 24 native `confirm()` / `prompt()` / `alert()` calls ("This page says…") a
 - **Safety & keyboard:** destructive dialogs focus Cancel so a stray Enter can't delete; Enter confirms otherwise, Esc cancels, Tab stays inside the dialog, Ctrl+1–9 is blocked behind it; multiple dialogs queue. Factory Reset is now one dialog with a type-DELETE field (button stays disabled until it matches exactly) instead of confirm + prompt.
 - **Every message was rewritten** with specifics: deletes show a one-line summary of the record (`RecordService.summary()`), backup restore shows the file name, export date and record counts, cost sync lists each price change, reconcile shows ledger vs. live stock, and so on. The old `#message-box` was removed. `APP_VERSION` → 2026.3.3.
 - Verification: new dialog suite 21/21 (no native pop-ups at all, content, Cancel focus on danger, Enter/Esc/Tab behaviour, shortcut blocking, confirm/cancel results, type-DELETE gating, queueing, alert, light theme, phone bottom sheet); sidebar 19/19, welcome 21/21, main 106/106, PWA 10/10; zero console errors.
+
+## 18. Round 12 — Settings Split Into Sections (Sidebar Dropdown)
+
+Settings in the sidebar is now a dropdown; each section is its own page with a URL (`#settings/workers`, browser Back/Forward work) and full management:
+
+| Section | Management |
+|---|---|
+| Overview | A tile per section with a live status line (e.g. "2 active · 3 total", "All checks passed") |
+| Account & Sync | Sign-in/sync status, log out, password-reset email (email accounts), **display name on this device** (set/remove) |
+| User Access *(admin only — §19)* | Approve / decline / revoke / delete access requests; pre-approve emails (add/edit/remove) |
+| Business Profile | Edit, **reset to defaults**, live letterhead preview, print test page |
+| Preferences | Device (theme, welcome screen, compact sidebar) and shared settings (save / **reset to defaults**) |
+| Workers | Add / edit / delete, inline rate edit, **Active/Inactive** status (inactive = hidden from Manufacturing dropdowns, history kept), balance due, last remitted |
+| Suppliers *(new)* | Supplier directory (add / edit / delete / deactivate); auto-created from existing POs and whenever a new supplier is typed on a PO; renaming carries over to past POs; PO count, amount purchased, "+ PO" shortcut |
+| Expense Categories | Add, **rename** (updates past expenses), **reorder**, delete (choose which category its expenses move to, or keep the label) |
+| App & Offline | Install, updates, version, storage, reset tour/welcome |
+| Data Health | Checks + fixes (incl. restoring deleted-but-referenced workers as inactive) |
+| Backup & Restore | JSON backup/restore, **CSV export of any table** (11 lists), factory reset, clear cache |
+
+On phones and with the icon-only sidebar, the page shows section tabs instead of the dropdown. Also: browser history entries per page (Android back button works), `#reports/<view>` routes, dialog focus-restore bug fixed. Verified: settings suite 46/46.
+
+## 19. Round 13 — Google Sign-In With Admin Approval; Login-Page Flash Fixed
+
+**Login flash (reported bug):** the sign-in form was visible while Firebase was still restoring a remembered session, then jumped to the dashboard. Now a splash ("Checking your session…") shows until Firebase knows; the form only appears when nobody is signed in. Verified by watching the DOM during reload.
+
+**Flow.** "Continue with Google" (popup; full-page redirect in the installed app / where popups fail). The email & password login is still there, tucked behind "Sign in with email & password", and goes through the same approval. On first sign-in the app creates `users/{uid}` in Firestore:
+- **Admin** (`ADMIN_EMAILS` in `js/config/firebase-config.js` — felixpareja.pmdit07@gmail.com — *with a provider-verified email*) → approved automatically.
+- **Pre-approved email** (`invites/{email}`) → approved automatically.
+- **Everyone else** → *pending*: a "Waiting for approval" screen with their Google name/photo, **Check Status**, and a live listener — the moment the admin approves, they are signed in automatically. Declined users see the admin's note and can **Request Again**; revoked users are locked out immediately (even mid-session).
+
+**Admin page:** Settings → **User Access** (only visible to the admin): pending count badge on the sidebar + a notification toast for each new request + an item on the welcome screen; table of everyone with Approve / Decline (with note) / Revoke / Delete; **Pre-approved Emails** (add / edit note / remove).
+
+**Security rules** (`firestore.rules`, also wired in `firebase.json`): only approved users/admin can read or write `business/main`; a user can only create their own *pending* record, can never change their own status or role (except rejected → pending), can't list others; only the admin manages records and invites. The app ignores unconfirmed local writes to a user's own record, so tampering can't flash the app open.
+
+**Verified against the Firebase Emulator Suite** (Auth + Firestore with these exact rules): 41/41 — splash then login, admin auto-approval + shared data seeding, pending screen, 7 tampering attempts all denied by the rules, admin badge/notification/table, approve → requester signed in automatically, live sync, revoke → locked out + data denied, decline with note → request again, delete → new request, pre-approved email → straight in, unverified email account is *not* admin, session restore without login flash, log out, and the real "Continue with Google" button via the emulator's sign-in popup. All other suites still pass (main 106, settings 46, welcome 21, sidebar 19, dialogs 21, PWA 10).
+
+### One-time setup (Firebase Console, project bebang-ecbce)
+1. **Authentication → Sign-in method → Add new provider → Google → Enable** (pick a support email) → Save.
+2. **Authentication → Settings → Authorized domains → Add domain** → your Vercel domain (e.g. `bebang.vercel.app`, plus any custom domain).
+3. **Firestore Database → Rules** → replace everything with the contents of `firestore.rules` → **Publish** (or `firebase deploy --only firestore:rules`).
+4. Deploy the app (push to GitHub → Vercel).
+5. Sign in **with Google** as felixpareja.pmdit07@gmail.com first — you're approved automatically as admin.
+6. Ask staff to open the site and "Continue with Google"; approve them in Settings → User Access (or pre-approve their emails first).
+
+**About the old shared password.** Signing in with Google as felixpareja.pmdit07@gmail.com makes that email "verified". If the shared email/password login for the same address still works afterwards, anyone who knows that password would be signed in as the admin — so after step 5, **change that password** (Authentication → Users → ⋮ → Reset password) or turn off Email/Password under Sign-in method once everyone uses Google.
+
+**Local testing with emulators:** `firebase emulators:start --only auth,firestore` then open `http://localhost:<port>/index.html?emulator` (the `?emulator` switch only works on localhost/127.0.0.1).

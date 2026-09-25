@@ -13,6 +13,10 @@ const FIREBASE_CONFIG = {
     appId: "1:1543783955:web:49509fa161491da6a121e6"
 };
 
+// Administrators: approved automatically, and approve everyone else in Settings → User Access.
+// Keep this list in sync with isAdmin() in firestore.rules (the rules are what actually enforce it).
+const ADMIN_EMAILS = ['felixpareja.pmdit07@gmail.com'];
+
 // Local IndexedDB names (unchanged from the single-file version so existing data carries over).
 const STORE_NAME = 'BebangBizSystem_v1';
 const DATA_KEY = 'beb_biz_data_v1';

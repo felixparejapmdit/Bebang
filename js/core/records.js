@@ -15,7 +15,8 @@ class RecordService {
         exp: { collection: 'expenses', label: 'Expense' },
         pay: { collection: 'payrollPayments', label: 'Payroll Payment' },
         cust: { collection: 'customers', label: 'Customer' },
-        worker: { collection: 'workers', label: 'Worker' }
+        worker: { collection: 'workers', label: 'Worker' },
+        supplier: { collection: 'suppliers', label: 'Supplier' }
     };
 
     constructor(app) { this.app = app; }
@@ -26,7 +27,7 @@ class RecordService {
 
     // ---------- option lists used by forms ----------
     workerOptions(current) {
-        const names = this.data.workers.map(w => w.name);
+        const names = this.data.workers.filter(w => w.active !== false).map(w => w.name);
         if (current && !names.includes(current)) names.push(current);
         return names;
     }
@@ -34,7 +35,20 @@ class RecordService {
         return this.data.inventory.filter(i => types.includes(i.type))
             .map(i => ({ value: i.id, label: `${i.name} (Stock: ${Utils.formatNumber(i.stock, 4)} ${i.units || ''})` }));
     }
-    supplierNames() { return [...new Set(this.data.purchaseOrders.map(p => p.supplier).filter(Boolean))].sort(); }
+    supplierNames() {
+        return [...new Set([...this.data.suppliers.filter(s => s.active !== false).map(s => s.name), ...this.data.purchaseOrders.map(p => p.supplier).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
+    }
+    /** Returns the supplier record for a typed name, creating it the first time (like customers). */
+    findOrCreateSupplier(rawName) {
+        const name = String(rawName || '').trim();
+        if (!name) return null;
+        let s = this.data.suppliers.find(x => Utils.sameText(x.name, name));
+        if (!s) {
+            s = { id: `VEND-${Utils.uuid()}`, name, contact: '', phone: '', email: '', address: '', notes: '', active: true };
+            this.data.suppliers.push(s);
+        }
+        return s;
+    }
     customerNames() { return this.data.customers.map(c => c.name).sort((a, b) => a.localeCompare(b)); }
 
     findOrCreateCustomer(rawName) {
@@ -133,7 +147,18 @@ class RecordService {
                     { key: 'name', label: 'Worker Name', type: 'text', value: r.name || '', required: true, span: 'full' },
                     { key: 'rate', label: 'Rate (₱ per splint)', type: 'number', min: 0, value: r.rate ?? 0, required: true },
                     { key: 'phone', label: 'Phone', type: 'tel', value: r.phone || '' },
+                    { key: 'status', label: 'Status', type: 'select', options: [{ value: 'active', label: 'Active — shown in Manufacturing' }, { value: 'inactive', label: 'Inactive — hidden, history kept' }], value: r.active === false ? 'inactive' : 'active' },
                     { key: 'notes', label: 'Notes', type: 'textarea', value: r.notes || '', span: 'full' }
+                ];
+            case 'supplier':
+                return [
+                    { key: 'name', label: 'Supplier Name', type: 'text', value: r.name || '', required: true, span: 'full' },
+                    { key: 'contact', label: 'Contact Person', type: 'text', value: r.contact || '' },
+                    { key: 'phone', label: 'Phone', type: 'tel', value: r.phone || '' },
+                    { key: 'email', label: 'Email', type: 'email', value: r.email || '' },
+                    { key: 'status', label: 'Status', type: 'select', options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive — hidden from suggestions' }], value: r.active === false ? 'inactive' : 'active' },
+                    { key: 'address', label: 'Address', type: 'text', value: r.address || '', span: 'full' },
+                    { key: 'notes', label: 'Notes (items supplied, terms…)', type: 'textarea', value: r.notes || '', span: 'full' }
                 ];
         }
         return [];
@@ -155,7 +180,10 @@ class RecordService {
                     d.customers.push({ id: `CUST-${Utils.uuid()}`, ...v });
                 } else if (kind === 'worker') {
                     if (d.workers.some(w => Utils.sameText(w.name, v.name))) { modal.setError('A worker with that name already exists.'); return false; }
-                    d.workers.push({ id: Utils.uuid(), name: v.name, rate: v.rate || 0, phone: v.phone, notes: v.notes });
+                    d.workers.push({ id: Utils.uuid(), name: v.name, rate: v.rate || 0, phone: v.phone, notes: v.notes, active: v.status !== 'inactive' });
+                } else if (kind === 'supplier') {
+                    if (d.suppliers.some(s => Utils.sameText(s.name, v.name))) { modal.setError('A supplier with that name already exists.'); return false; }
+                    d.suppliers.push({ id: `VEND-${Utils.uuid()}`, name: v.name, contact: v.contact, phone: v.phone, email: v.email, address: v.address, notes: v.notes, active: v.status !== 'inactive' });
                 } else if (kind === 'pay') {
                     const pay = { id: Utils.nextId('PAY', d.payrollPayments), date: v.date, workerName: v.workerName, amount: v.amount, note: v.note };
                     d.payrollPayments.push(pay);
@@ -244,7 +272,11 @@ class RecordService {
                 break;
             case 'worker':
                 if (d.workers.some(w => w.id !== rec.id && Utils.sameText(w.name, v.name))) { modal.setError('Another worker already has that name.'); return false; }
-                Object.assign(next, { name: v.name, rate: v.rate || 0, phone: v.phone, notes: v.notes });
+                Object.assign(next, { name: v.name, rate: v.rate || 0, phone: v.phone, notes: v.notes, active: v.status !== 'inactive' });
+                break;
+            case 'supplier':
+                if (d.suppliers.some(s => s.id !== rec.id && Utils.sameText(s.name, v.name))) { modal.setError('Another supplier already has that name.'); return false; }
+                Object.assign(next, { name: v.name, contact: v.contact, phone: v.phone, email: v.email, address: v.address, notes: v.notes, active: v.status !== 'inactive' });
                 break;
         }
 
@@ -260,6 +292,7 @@ class RecordService {
         // Carry renames / linked values over to related records.
         if (kind === 'worker' && rec.name !== next.name) this._renameWorker(rec.name, next.name);
         if (kind === 'cust' && rec.name !== next.name) d.salesOrders.forEach(so => { if (so.customer_id === rec.id) so.customer_name = next.name; });
+        if (kind === 'supplier' && rec.name !== next.name) d.purchaseOrders.forEach(po => { if (Utils.sameText(po.supplier, rec.name)) po.supplier = next.name; });
         if (kind === 'pay') {
             const exp = d.expenses.find(e => e.paymentId === rec.id);
             if (exp) Object.assign(exp, { date: next.date, amount: next.amount, description: `Payroll: ${next.workerName}`, notes: next.note });
@@ -313,7 +346,11 @@ class RecordService {
             const n = d.salesOrders.filter(so => so.customer_id === rec.id).length;
             if (n) details.push(`${n} sales order(s) for this customer are kept as records`);
         }
-        if (kind === 'worker') details.push('Their past remittances, issuances and payments are kept as records');
+        if (kind === 'worker') details.push('Their past remittances, issuances and payments are kept as records. Tip: set them Inactive instead to hide them but keep them editable');
+        if (kind === 'supplier') {
+            const n = d.purchaseOrders.filter(po => Utils.sameText(po.supplier, rec.name)).length;
+            if (n) details.push(`${n} purchase order(s) keep the supplier name as a record`);
+        }
         const problems = this.stock.problems(fx);
         if (!(await this.app.ui.confirm({
             title: `Delete this ${label.toLowerCase()}?`, tone: 'danger', confirmLabel: 'Delete', cancelLabel: 'Keep it',

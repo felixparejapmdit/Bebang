@@ -60,6 +60,8 @@ class WelcomeScreen {
 
     alerts(s) {
         const list = [];
+        const waiting = this.app.access.isAdmin ? this.app.access.pendingCount : 0;
+        if (waiting) list.push({ icon: 'key', color: 'violet', text: `${waiting} access request${waiting === 1 ? '' : 's'} waiting for your approval`, tab: 'settings/users' });
         if (s.pending.length) list.push({ icon: 'truck', color: 'amber', text: `${s.pending.length} deliver${s.pending.length === 1 ? 'y' : 'ies'} waiting to be fulfilled (${Utils.formatCurrency(s.pending.reduce((a, o) => a + (o.total || 0), 0))})`, tab: 'sales' });
         if (s.arrivedPOs.length) list.push({ icon: 'procurement', color: 'blue', text: `${s.arrivedPOs.length} purchase order${s.arrivedPOs.length === 1 ? ' has' : 's have'} arrived — check the stock in`, tab: 'procurement' });
         if (s.out.length) list.push({ icon: 'alert', color: 'red', text: `${s.out.length} item${s.out.length === 1 ? ' is' : 's are'} out of stock${s.out.length <= 3 ? `: ${s.out.map(i => i.name).join(', ')}` : ''}`, tab: 'inventory' });
@@ -78,8 +80,8 @@ class WelcomeScreen {
     setupSteps() {
         const d = this.app.data;
         const steps = [
-            { done: d.settings.businessName !== DEFAULT_SETTINGS.businessName || !!d.settings.phone || !!d.settings.address, text: 'Fill in your business profile', tab: 'settings' },
-            { done: d.workers.length > 0, text: 'Add your workers and their rates', tab: 'settings' },
+            { done: d.settings.businessName !== DEFAULT_SETTINGS.businessName || !!d.settings.phone || !!d.settings.address, text: 'Fill in your business profile', tab: 'settings/profile' },
+            { done: d.workers.length > 0, text: 'Add your workers and their rates', tab: 'settings/workers' },
             { done: d.inventory.some(i => i.stock > 0) || d.manualAdjustments.length > 0, text: 'Log your opening stock', tab: 'inventory' },
             { done: d.salesOrders.length > 0, text: 'Record your first sale', tab: 'sales' }
         ];

@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// Bebang BMS — Firestore Security Rules (approval-based access).
+// Publish: Firebase Console → Firestore Database → Rules → paste this file → Publish,
+//      or: firebase deploy --only firestore:rules
+//
+//   business/main   the shared business data — approved users and admins only
+//   users/{uid}     one access record per signed-in account (pending/approved/rejected/revoked)
+//   invites/{email} emails the admin pre-approved (let in on first sign-in)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function verified() { return request.auth.token.email_verified == true; }
+
+    // Keep in sync with ADMIN_EMAILS in js/config/firebase-config.js.
+    function isAdmin() {
+      return signedIn() && verified() && myEmail() in ['felixpareja.pmdit07@gmail.com'];
+    }
+    function myRecord() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function isApproved() {
+      return isAdmin() || (signedIn() && exists(myRecord()) && get(myRecord()).data.status == 'approved');
+    }
+    function invited() {
+      return signedIn() && verified() && exists(/databases/$(database)/documents/invites/$(myEmail()));
+    }
+
+    match /business/main {
+      allow read, write: if isApproved();
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      // First sign-in: you may only create YOUR OWN record, as a pending "user"
+      // (or already approved if the admin pre-approved your verified email).
+      allow create: if isAdmin() || (
+        signedIn() && request.auth.uid == uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.email == request.auth.token.email
+        && (request.resource.data.status == 'pending' || (request.resource.data.status == 'approved' && invited()))
+      );
+      // You may refresh your own profile/last-seen, but never change your own status or role —
+      // except asking again after a decline (rejected → pending). The admin can change anything.
+      allow update: if isAdmin() || (
+        signedIn() && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && (request.resource.data.status == resource.data.status
+            || (resource.data.status == 'rejected' && request.resource.data.status == 'pending'))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /invites/{inviteEmail} {
+      allow get: if isAdmin() || (signedIn() && myEmail() == inviteEmail);
+      allow list, create, update, delete: if isAdmin();
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

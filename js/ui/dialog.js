@@ -114,7 +114,10 @@ class Dialog {
         setTimeout(() => {
             if (this.current) return; // another dialog already took over
             el.classList.remove('visible', 'dlg-leave');
-            if (this._returnFocus && this._returnFocus.focus && document.contains(this._returnFocus)) this._returnFocus.focus();
+            // Give focus back only if the user hasn't already moved on to something else.
+            const a = document.activeElement;
+            const untouched = !a || a === document.body || el.contains(a);
+            if (untouched && this._returnFocus && this._returnFocus.focus && document.contains(this._returnFocus)) this._returnFocus.focus();
             if (this.queue.length) this._next();
         }, 160);
         resolve(result);

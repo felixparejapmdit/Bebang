@@ -14,10 +14,19 @@ class CloudSync {
         firebase.initializeApp(config);
         this.auth = firebase.auth();
         this.db = firebase.firestore();
+        if (CloudSync.useEmulators) {
+            // Local Firebase emulators, for development/testing only: http://localhost:…/?emulator
+            this.auth.useEmulator('http://127.0.0.1:9099', { disableWarnings: true });
+            this.db.useEmulator('127.0.0.1', 8080);
+            return;
+        }
         // Cache locally so the app keeps working offline (reads from cache, queues writes).
         this.db.enablePersistence({ synchronizeTabs: true }).catch(err => {
             console.warn('Firestore offline persistence unavailable:', err.code);
         });
+    }
+    static get useEmulators() {
+        return ['localhost', '127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('emulator');
     }
     get user() { return this.auth ? this.auth.currentUser : null; }
     get sharedDoc() { return this.db.collection('business').doc('main'); }
@@ -143,7 +152,7 @@ class DataStore {
         if (!Array.isArray(d.inventory)) d.inventory = structuredClone(initialData.inventory);
         if (!d.salesOrders) d.salesOrders = incoming.orders || [];
         if (!d.manufacturingOrders) d.manufacturingOrders = incoming.productionLog ? incoming.productionLog.map(p => ({ ...p, status: 'Completed' })) : [];
-        ['customers', 'purchaseOrders', 'issuances', 'workers', 'manualAdjustments', 'payrollPayments', 'expenses', 'salesOrders', 'manufacturingOrders']
+        ['customers', 'purchaseOrders', 'issuances', 'workers', 'manualAdjustments', 'payrollPayments', 'expenses', 'salesOrders', 'manufacturingOrders', 'suppliers']
             .forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
         if (!d.costingRows) d.costingRows = structuredClone(DEFAULT_COSTING);
         if (!d.rawMaterialPriceRows) d.rawMaterialPriceRows = structuredClone(DEFAULT_RAW_MATERIAL_PRICES);
@@ -163,7 +172,16 @@ class DataStore {
             if (!w.id) w.id = Utils.uuid();
             if (w.rate === undefined) w.rate = 0;
         });
+        d.workers.forEach(w => { if (w.active === undefined) w.active = true; });
         d.customers.forEach(c => { if (!c.id) c.id = `CUST-${Utils.uuid()}`; });
+        // Supplier list (added later): seed it from the supplier names already typed on purchase orders.
+        d.purchaseOrders.forEach(po => {
+            const name = String(po.supplier || '').trim();
+            if (name && !d.suppliers.some(s => Utils.sameText(s.name, name))) {
+                d.suppliers.push({ id: `VEND-${Utils.uuid()}`, name, contact: '', phone: '', email: '', address: '', notes: '', active: true });
+            }
+        });
+        d.suppliers.forEach(s => { if (!s.id) s.id = `VEND-${Utils.uuid()}`; if (s.active === undefined) s.active = true; });
         d.expenses.forEach(e => {
             if (!e.id) e.id = Utils.nextId('EXP', d.expenses, 4);
             if (!e.category) e.category = 'Other';

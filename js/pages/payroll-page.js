@@ -14,7 +14,7 @@ class PayrollPage extends BasePage {
         const d = this.data;
         const inRange = (date) => FinanceService.inRange(date, from, to);
         const names = new Set(d.workers.map(w => w.name));
-        const rows = d.workers.map(w => ({ id: w.id, name: w.name, rate: w.rate || 0, phone: w.phone || '', active: true }));
+        const rows = d.workers.map(w => ({ id: w.id, name: w.name, rate: w.rate || 0, phone: w.phone || '', active: true, inactive: w.active === false }));
         // Keep people who were deleted but still have unpaid history visible.
         [...d.manufacturingOrders.map(m => m.workerName), ...d.payrollPayments.map(p => p.workerName)].forEach(n => {
             if (n && !names.has(n)) { names.add(n); rows.push({ id: null, name: n, rate: 0, phone: '', active: false }); }
@@ -50,10 +50,10 @@ class PayrollPage extends BasePage {
             ${this.tables.render({
                 id: 'payroll-summary', title: 'Worker Pay Summary', subtitle: allTime ? 'All-time totals.' : `Earned & paid within ${range.label}; balance column is still all-time.`,
                 rows: allTime ? rows : rows.map(r => ({ ...r, balance: (this.summary().find(x => x.name === r.name) || {}).balance || 0 })),
-                defaultSort: { key: 'balance', dir: 'desc' }, exportName: 'payroll_summary', emptyText: 'No workers yet. Add workers here or in Settings → Worker Management.',
+                defaultSort: { key: 'balance', dir: 'desc' }, exportName: 'payroll_summary', emptyText: 'No workers yet. Add workers here or in Settings → Workers.',
                 addButton: { label: 'Add Worker', onclick: "App.records.create('worker')" },
                 columns: [
-                    { key: 'name', label: 'Worker', render: r => `<span class="text-white font-bold">${Utils.esc(r.name)}</span>${r.active ? '' : ' ' + this.ui.badge('removed', 'gray')}` },
+                    { key: 'name', label: 'Worker', render: r => `<span class="text-white font-bold">${Utils.esc(r.name)}</span>${r.active ? '' : ' ' + this.ui.badge('removed', 'gray')}${r.inactive ? ' ' + this.ui.badge('inactive', 'gray') : ''}` },
                     { key: 'splints', label: 'Splints Remitted', align: 'right', total: 'sum', format: 'number' },
                     { key: 'rate', label: 'Rate (₱/splint)', align: 'right', format: 'currency' },
                     { key: 'earned', label: 'Total Earned', align: 'right', format: 'currency', total: 'sum', render: r => `<span class="text-green-400">${Utils.formatCurrency(r.earned)}</span>` },

@@ -21,7 +21,7 @@ class ProcurementPage extends BasePage {
                     </select>`)}
                 ${this.ui.field('Quantity *', `<input type="number" id="po-item-qty" value="1" min="0.0001" step="any" class="field-input" oninput="App.procurement.updateTotal()">`)}
                 ${this.ui.field('Unit Cost (₱) *', `<input type="number" id="po-item-cost" value="0" min="0" step="any" class="field-input" oninput="App.procurement.updateTotal()">`)}
-                ${this.ui.field('Supplier', `<input type="text" id="po-supplier" list="po-supplier-list" placeholder="Optional" class="field-input">
+                ${this.ui.field('Supplier', `<input type="text" id="po-supplier" list="po-supplier-list" placeholder="Optional" value="${Utils.esc(this.consumePrefill())}" class="field-input">
                     <datalist id="po-supplier-list">${this.records.supplierNames().map(n => `<option value="${Utils.esc(n)}">`).join('')}</datalist>`)}
                 <p id="po-total-hint" class="text-xs text-secondary col-span-full sm:col-span-1 xl:col-span-4 self-center"></p>
                 <div class="tooltip-container col-span-full sm:col-span-1 xl:col-span-2">
@@ -84,6 +84,10 @@ class ProcurementPage extends BasePage {
             </div>`;
     }
 
+    /** Settings → Suppliers → "New PO" pre-fills the supplier once. */
+    consumePrefill() { const v = this.prefillSupplier || ''; this.prefillSupplier = ''; return v; }
+    newPOFor(supplierName) { this.prefillSupplier = supplierName; this.app.navigate('procurement'); setTimeout(() => { const el = document.getElementById('po-item-name'); if (el) el.focus(); }, 50); }
+
     onItemName() {
         const it = this.stock.findItemByName(this.val('po-item-name'));
         if (it && it.type !== 'splint') {
@@ -107,8 +111,9 @@ class ProcurementPage extends BasePage {
         const existing = this.stock.findItemByName(name);
         if (existing && existing.type === 'splint') return this.ui.toast('Splints are produced (Manufacturing → Remittance), not purchased.', 'error');
         const id = Utils.nextId('PO', this.data.purchaseOrders);
+        const supplier = this.records.findOrCreateSupplier(this.val('po-supplier'));
         this.data.purchaseOrders.unshift({
-            id, date: Utils.today(), status: 'Draft', supplier: this.val('po-supplier'),
+            id, date: Utils.today(), status: 'Draft', supplier: supplier ? supplier.name : '',
             items: [{ name: existing ? existing.name : name, qty, unit_cost: cost, type: existing ? existing.type : type }]
         });
         await this.app.saveAndRerender();

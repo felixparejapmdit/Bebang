@@ -22,6 +22,8 @@ class ReportsPage extends BasePage {
     }
 
     setView(view) { this.view = view; this.app.render('reports', { skipAnimation: true }); }
+    setRoute(sub) { this.view = ReportsPage.VIEWS.some(v => v.key === sub) ? sub : 'financial'; }
+    routeSuffix() { return this.view === 'financial' ? '' : this.view; }
     afterRender() { this.ui.animateMetrics(); }
 
     render() {
