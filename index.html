@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Bebang's Business Management System — 2026 Edition</title>
+    <meta name="description" content="Splint production, inventory, sales, payroll and reports for BC&E Medical Supplies.">
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Bebang BMS">
+
+    <!-- Styles: design system + Tailwind (browser JIT, bundled locally for offline use) -->
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/vendor/tailwind.js"></script>
+    <script src="js/config/tailwind.config.js"></script>
+
+    <!-- Libraries (local copies — no CDN, so the app works offline) -->
+    <script src="js/vendor/localforage.min.js"></script>
+    <script src="js/vendor/firebase-app-compat.js"></script>
+    <script src="js/vendor/firebase-auth-compat.js"></script>
+    <script src="js/vendor/firebase-firestore-compat.js"></script>
+</head>
+<body class="dark-theme" oncontextmenu="App.contextMenu.hide()">
+
+    <!-- ============ Sign-in (only shown when Firebase sync is configured) ============ -->
+    <div id="auth-screen" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
+        <form class="glass-panel p-6 sm:p-8 w-full max-w-sm" onsubmit="event.preventDefault(); App.auth.signIn()">
+            <div class="flex items-center space-x-3 mb-6">
+                <div class="logo-mark">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10l2-2m-2-6h16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2zm4 4h4m-4 4h4m-4 4h4"></path></svg>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-base sm:text-lg font-extrabold text-white leading-tight">Bebang's Business Management System</h1>
+                    <p class="text-xs text-secondary mt-0.5">Sign in to sync your data</p>
+                </div>
+            </div>
+            <div id="auth-error" class="hidden mb-4 text-sm text-red-400 bg-red-500/10 p-2 rounded-lg" role="alert"></div>
+            <label class="field-label" for="auth-email">Email</label>
+            <input type="email" id="auth-email" placeholder="Email" autocomplete="username" class="w-full mb-3 p-2 rounded-lg">
+            <label class="field-label" for="auth-password">Password</label>
+            <div class="relative mb-2">
+                <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" class="w-full p-2 pr-16 rounded-lg">
+                <button type="button" onclick="App.auth.togglePasswordVisibility()" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-secondary hover:text-white">Show</button>
+            </div>
+            <div class="text-right mb-4"><button type="button" onclick="App.auth.resetPassword()" class="text-xs text-secondary hover:text-white underline">Forgot password?</button></div>
+            <button type="submit" id="auth-signin-btn" class="w-full bg-primary text-white font-bold py-2 rounded-lg">Sign In</button>
+            <p class="text-xs text-secondary text-center mt-4">Ask the business owner for the shared login if you don't have it.</p>
+        </form>
+    </div>
+
+    <!-- ============ App shell ============ -->
+    <div id="app" class="flex flex-col p-0 overflow-hidden hidden">
+        <header class="px-3 py-3 sm:px-5 border-b border-white/10 flex items-center justify-between gap-3 flex-shrink-0 no-print">
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <button type="button" onclick="App.toggleSidebar()" class="header-icon-btn hidden md:inline-flex text-secondary" title="Collapse / expand sidebar" aria-label="Toggle sidebar">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <div class="logo-mark">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10l2-2m-2-6h16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2zm4 4h4m-4 4h4m-4 4h4"></path></svg>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-sm sm:text-lg md:text-xl font-extrabold text-white leading-tight truncate"><span id="header-title">Bebang's Business Management System</span> <span class="text-accent text-xs font-bold align-middle">2026</span></h1>
+                    <p id="header-tagline" class="hidden sm:block text-xs text-secondary mt-0.5 truncate">BC&E Medical Supplies · Splint Production & Sales</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <button type="button" id="header-install-btn" onclick="App.pwa.install()" class="dt-btn dt-btn-primary hidden" title="Install as an app">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg><span class="hidden sm:inline">Install</span>
+                </button>
+                <button type="button" onclick="App.toggleTheme()" class="header-icon-btn md:hidden text-secondary" title="Toggle light / dark" aria-label="Toggle theme">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" id="theme-toggle-icon"></svg>
+                </button>
+                <button type="button" id="status-pill" onclick="App.navigate('settings')" title="Account &amp; sync settings" class="status-pill max-w-[9rem] sm:max-w-[16rem]"><span class="pulse-dot flex-shrink-0"></span><span id="session-status-pill" class="truncate">Session Active</span></button>
+            </div>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden no-print">
+            <nav id="sidebar" class="flex flex-shrink-0" aria-label="Main navigation"></nav>
+            <main id="content" class="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto overflow-x-hidden"></main>
+        </div>
+    </div>
+
+    <!-- ============ Welcome screen (after sign-in; filled by WelcomeScreen) ============ -->
+    <div id="welcome-screen" class="hidden"></div>
+
+    <!-- ============ Dialogs (outside #app so they always cover the full viewport) ============ -->
+    <div id="dialog" class="dlg-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="dlg-title" aria-describedby="dlg-message">
+        <div id="dlg-card" class="dlg-card"></div>
+    </div>
+
+    <div id="form-modal" class="modal-backdrop fixed inset-0 z-[120] p-4" role="dialog" aria-modal="true" aria-labelledby="form-modal-title">
+        <form id="form-modal-box" class="modal-content glass-panel p-5 sm:p-6 max-w-lg w-full rounded-xl" onsubmit="event.preventDefault(); App.modal.submit()" novalidate>
+            <h3 id="form-modal-title" class="text-xl font-bold text-white">Edit</h3>
+            <p id="form-modal-subtitle" class="text-xs text-secondary mt-1 hidden"></p>
+            <div id="form-modal-error" class="hidden mt-3 text-sm text-red-400 bg-red-500/10 p-2 rounded-lg" role="alert"></div>
+            <div id="form-modal-fields" class="grid gap-3 mt-4"></div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="App.modal.close()" class="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm">Cancel</button>
+                <button type="submit" id="form-modal-submit" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="context-menu" class="glass-panel z-[130] p-2 hidden flex-col rounded-xl shadow-lg">
+        <button onclick="App.contextMenu.action('edit')" class="px-4 py-2 text-left glass-item hover:text-primary rounded-lg text-sm">View / Edit</button>
+        <button onclick="App.contextMenu.action('delete')" class="px-4 py-2 mt-1 text-left glass-item hover:text-red-500 rounded-lg text-sm">Delete</button>
+    </div>
+
+    <div id="attachment-modal" class="modal-backdrop fixed inset-0 z-[110] p-4" role="dialog" aria-modal="true">
+        <div class="modal-content glass-panel p-6 max-w-md w-full rounded-xl">
+            <h3 class="text-xl font-bold mb-4 text-white">Photo <span id="attachment-type-label" class="text-primary"></span></h3>
+            <div id="drop-zone" class="p-6 text-center rounded-xl bg-white/5 h-44 flex flex-col items-center justify-center">
+                <p class="text-lg font-semibold text-secondary">Drag & Drop Image Here</p>
+                <p class="text-sm text-secondary mb-3">or Paste from Clipboard, or Click to Select</p>
+                <input type="file" id="file-input" accept="image/*" capture="environment" class="hidden" onchange="App.attachments.handleFile(event)">
+                <button type="button" onclick="document.getElementById('file-input').click()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm" title="Images are auto-compressed to save space">Upload / Take Photo</button>
+            </div>
+            <div id="preview-area" class="mt-4 hidden max-h-64 overflow-y-auto">
+                <p id="preview-label" class="text-sm text-secondary mb-2">Preview (will be compressed):</p>
+                <img id="image-preview" class="max-w-full h-auto rounded-lg border border-white/20" alt="Photo preview">
+            </div>
+            <div class="flex justify-between gap-3 mt-6">
+                <button type="button" id="delete-attachment-btn" onclick="App.attachments.remove()" class="hidden text-red-400 hover:text-red-300 text-sm font-semibold">Remove Photo</button>
+                <div class="flex gap-3 ml-auto">
+                    <button type="button" onclick="App.attachments.close()" class="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm">Close</button>
+                    <button type="button" id="save-attachment-btn" onclick="App.attachments.save()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50" disabled>Save Photo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tour-modal" class="modal-backdrop fixed inset-0 z-[10000] p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+        <div id="tour-guide-card" class="modal-content glass-panel p-6 max-w-md w-full rounded-xl z-[10001]">
+            <div class="flex items-center justify-between mb-2"><span id="tour-progress" class="text-xs text-secondary"></span></div>
+            <h3 id="tour-title" class="text-xl font-bold text-primary mb-3">Welcome!</h3>
+            <p id="tour-content" class="text-white mb-6 text-sm leading-relaxed">Let's take a quick tour.</p>
+            <div class="flex justify-between items-center">
+                <button id="tour-skip-btn" onclick="App.tour.close()" class="text-secondary hover:text-white text-sm">Skip (Esc)</button>
+                <div class="flex space-x-3">
+                    <button id="tour-prev-btn" onclick="App.tour.prev()" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50" disabled>&larr; Prev</button>
+                    <button id="tour-next-btn" onclick="App.tour.next()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm">Next &rarr;</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="inventory-log-modal" class="modal-backdrop fixed inset-0 z-[110] p-4" role="dialog" aria-modal="true">
+        <div class="modal-content glass-panel p-6 max-w-lg w-full rounded-xl">
+            <h3 class="text-xl font-bold mb-1 text-white">Stock History — <span id="log-item-name" class="text-primary"></span></h3>
+            <p id="log-summary" class="text-xs text-secondary mb-4"></p>
+            <div id="log-content" class="space-y-2 max-h-96 overflow-y-auto"></div>
+            <div class="flex justify-end mt-6">
+                <button onclick="App.history.close()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bom-editor-modal" class="modal-backdrop fixed inset-0 z-[110] p-4" role="dialog" aria-modal="true">
+        <div class="modal-content glass-panel p-6 max-w-lg w-full rounded-xl">
+            <h3 class="text-xl font-bold mb-4 text-white">Recipe (BOM) for <span id="bom-item-name" class="text-primary"></span></h3>
+            <div id="bom-content" class="space-y-2 max-h-72 overflow-y-auto mb-2"></div>
+            <p id="bom-cost" class="text-xs text-secondary mb-3"></p>
+            <form class="glass-item p-3 rounded-lg grid grid-cols-1 sm:grid-cols-3 gap-2" onsubmit="event.preventDefault(); App.bom.addMaterial()">
+                <select id="bom-add-material" class="p-2 rounded-lg sm:col-span-3"><option value="">Select Raw Material...</option></select>
+                <input type="number" id="bom-add-qty" value="1" min="0.0001" step="any" placeholder="Quantity *" class="p-2 rounded-lg sm:col-span-2">
+                <button type="submit" class="bg-primary text-white font-bold px-4 py-2 rounded-lg text-sm">Add Material</button>
+            </form>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="App.bom.close()" class="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm">Cancel</button>
+                <button onclick="App.bom.save()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">Save Recipe</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-stack" aria-live="polite"></div>
+    <div id="print-area"></div>
+
+    <!-- ============ Application (classic scripts, load order matters) ============ -->
+    <script src="js/config/version.js"></script>
+    <script src="js/config/firebase-config.js"></script>
+    <script src="js/data/seed.js"></script>
+    <script src="js/core/utils.js"></script>
+    <script src="js/core/store.js"></script>
+    <script src="js/core/stock.js"></script>
+    <script src="js/core/finance.js"></script>
+    <script src="js/core/records.js"></script>
+    <script src="js/core/auth.js"></script>
+    <script src="js/core/pwa.js"></script>
+    <script src="js/ui/ui.js"></script>
+    <script src="js/ui/dialog.js"></script>
+    <script src="js/ui/form-modal.js"></script>
+    <script src="js/ui/data-table.js"></script>
+    <script src="js/ui/printer.js"></script>
+    <script src="js/ui/widgets.js"></script>
+    <script src="js/ui/tour.js"></script>
+    <script src="js/ui/welcome.js"></script>
+    <script src="js/pages/base-page.js"></script>
+    <script src="js/pages/dashboard-page.js"></script>
+    <script src="js/pages/procurement-page.js"></script>
+    <script src="js/pages/inventory-page.js"></script>
+    <script src="js/pages/manufacturing-page.js"></script>
+    <script src="js/pages/sales-page.js"></script>
+    <script src="js/pages/reports-page.js"></script>
+    <script src="js/pages/costing-page.js"></script>
+    <script src="js/pages/payroll-page.js"></script>
+    <script src="js/pages/settings-page.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

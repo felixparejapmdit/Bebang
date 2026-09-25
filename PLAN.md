@@ -242,3 +242,73 @@ Chose Firebase (Firestore + Authentication) over building a custom API: it's a f
 Full regression suite (settings-tab, reset-buttons, tour walkthrough, glue fractions, payroll column — 37/37 checks) re-run against the real file in its shipped (unconfigured/dormant) state: all passing, zero console errors, `node --check` clean — confirming this round is a safe, no-behavior-change push for every current user.
 
 Real end-to-end sync verification was done against a local Firebase emulator suite (Auth + Firestore, no real cloud project needed — `firebase emulators:start`, with a portable JDK 21 fetched into scratchpad since the sandbox's default JDK was too old for the Firestore emulator) rather than taken on faith. This caught a genuine bug: the very first Firestore subscription after sign-in would sometimes fire before Firestore's internal credential provider had picked up the new auth token, getting one spurious `PERMISSION_DENIED` from Security Rules before the SDK gave up rather than self-healing. Fixed two ways — `await user.getIdToken()` before subscribing (closes most of the race), plus `subscribeToSharedData()` now retries with backoff (400ms × attempt, up to 4 tries) specifically on `permission-denied`, so a transient rejection immediately after sign-in can never silently kill the listener. Confirmed fixed with 4 consecutive clean emulator runs (12/12 checks each, zero console errors) covering: two separate signed-in browser contexts sharing one login ("Device A" / "Device B"); Device A adding a worker and Device B seeing it appear live with **no action taken on Device B's side**, both in `App.data` and in the rendered Payroll table; the Firestore document server-side confirmed to contain every synced field (`inventory`, `workers`, `salesOrders`, etc.) and to **not** contain `imageAttachments`, proving photos really do stay device-local rather than just trusting the code that's supposed to strip them; an unauthenticated REST read against the emulator rejected with 403 `PERMISSION_DENIED`, proving the Security Rules text in 13.3 is both syntactically valid and actually enforced; and Sign Out correctly returning to the login screen.
+
+## 14. Round 8 — Modular (OOP) Split, PWA, Full-Screen Layout, Table Management, Settings Overhaul
+
+Trigger: the user asked to break up `Bebang2026.html` (1.23 MB single file) into an object-oriented structure, make the app a PWA, make pages fill the screen, make every report work with management tools for all data tables, enhance Settings, and verify every page shows the right data in the right place.
+
+### 14.1 New structure (no build step — classic `<script>` files, so `file://` still works)
+`Bebang2026.html` is now a ~16 KB shell (head, sign-in, app frame, dialogs). Everything else is split by responsibility:
+
+| Path | Contents |
+|---|---|
+| `css/app.css` | Design system (was the inline `<style>`), plus new table/toast/settings/print styles |
+| `js/vendor/*` | Tailwind JIT, localforage, Firebase app/auth/firestore compat — unchanged, just moved out of the HTML |
+| `js/config/version.js` | `APP_VERSION` — shared by the page and the service worker; **bump on every deploy** |
+| `js/config/firebase-config.js` | `FIREBASE_CONFIG` + IndexedDB names (same names as before, so existing local data carries over) |
+| `js/data/seed.js` | `initialData`, `emptyData`, `DEFAULT_SETTINGS`, costing + historical reference tables |
+| `js/core/` | `Utils`, `CloudSync` + `DataStore` (load/migrate/save), `StockService` (stock effects + ledger), `FinanceService` (all money math), `RecordService` (create/edit/delete for every record type), `AuthService`, `PwaManager` |
+| `js/ui/` | `UI` (icons, toasts, badges, cards), `FormModal` (one dialog for every form), `DataTable`, `Printer`, widgets (`AttachmentManager`, `BomEditor`, `ItemHistory`, `ContextMenu`), `TourGuide` |
+| `js/pages/` | `BasePage` + one class per tab: Dashboard, Procurement, Inventory, Manufacturing, Sales, Reports, Costing, Payroll, Settings |
+| `js/app.js` | `BebangApp` composition root — router (tabs + `#hash`), theme, sidebar, shortcuts, boot. `window.App` exposes pages/services for inline handlers (`App.sales.createSO()`) |
+
+### 14.2 PWA
+`manifest.webmanifest` (name, icons 192/512 + maskable, shortcuts to Sales/Manufacturing/Inventory/Reports), `sw.js` (precaches the whole app shell per `APP_VERSION`; network-first for page loads, cache-first + background refresh for files; never touches Firebase/Google requests), PNG icons in `assets/icons/`, `index.html` redirects `/` → `Bebang2026.html`. Install button in the header (when the browser offers it) and in Settings → App & Offline; "new version available → Reload" toast when a new deploy is detected. Verified: Chrome reports zero installability errors, 40+ files precached, and the app loads and navigates with the network fully cut.
+
+### 14.3 Layout
+`#app` now fills the viewport (was capped at 1280px / 92vw×92vh). Header + collapsible icon-only sidebar on desktop (remembered per device); horizontally scrollable bottom nav on phones with safe-area padding; grids widen at `xl`/`2xl`. Dialogs moved outside `#app` (its `backdrop-filter` made `position: fixed` children relative to it). Verified no horizontal overflow on any tab at 390px.
+
+### 14.4 Data management & report fixes
+- **Every table is a `DataTable`**: search, click-to-sort, filters, paging, totals row, CSV export, print (with business letterhead), and per-row Edit/Delete. Covers inventory, adjustments, PO register, issuances, remittances, materials-by-worker, sales register, customers, ledger, stock summary, sales/production analyses, expenses, payroll, payments, workers, both costing tables.
+- **Edits/deletes keep stock correct**: all stock movement goes through `StockService.effectsOf()`, so deleting a checked-in PO / delivered sale / issued issuance / remittance / adjustment reverses its stock, and editing one applies only the difference (with a warning if stock would go negative). Previously deleting records left stock untouched and "Edit" just said "not yet available".
+- **Ledger reconciles**: editing an item's stock now logs a correction adjustment (was a silent overwrite); adjustments can be negative; PO lines remember their inventory id so renamed items keep their history; Reports → Stock & Valuation shows ledger vs live stock with one-click Reconcile.
+- **Bugs fixed**: printing produced a blank page (`#print-area` was inside the hidden `#app`); all "today"/month dates used UTC and were a day off between 00:00–08:00 PH time; dashboard sales counted undelivered orders; item History used the old BOM model and missed issuances/POS sales; Ctrl+9 (Settings) didn't work; deleting a record could create duplicate IDs; renaming a worker orphaned their payroll history; drag-drop/paste for photos was never wired up; "View Delivery/Payment" never showed the saved photo; user text was injected unescaped into HTML.
+- **New data**: Expenses (add/edit/delete, categories), customers list with orders/revenue, PO supplier, SO reference/DR no. and date, reorder level per item, payroll payments linked to their expense entry (edit/delete stays in sync), delivery receipts and payslips (print).
+- **Financials** (`FinanceService`): Net Profit = fulfilled sales − checked-in purchases − expenses, used identically by the dashboard, financial report (any period incl. custom range) and printouts.
+
+### 14.5 Settings
+Account & sync status, Business Profile (header + print letterhead), Preferences (theme dark/light/system per device, default low-stock level, rows per page, default report period, backup reminder), Expense Categories, Worker Management table, App & Offline (install / check for updates / replay tour), Data Health (stock-vs-ledger, negative stock, orphan refs, duplicate IDs, unknown workers), Backup & Restore (last-backup date, restore preview + confirm, Factory Reset now requires typing DELETE).
+
+### 14.6 Verification
+`node --check` on every file. Playwright end-to-end suite against the served app (local-only config): **105/105 checks**, zero console errors — full business cycle (stock → PO → issuance → remittance → POS/SO → deliver), edit/delete stock reversal, payroll ↔ expense linkage, rename propagation, finance totals, ledger reconciliation, table search/filter/sort/CSV/print, costing sync, BOM draft/save, settings, persistence across reload, backup → factory reset → restore, legacy-data migration, all 37 tour steps, and 390px mobile layout on all 9 tabs. PWA suite: **10/10** (redirect, sign-in shown with real config, SW active/controlling, precache, installable, manifest valid, offline load + navigation). Also confirmed the app still opens from `file://`.
+
+### 14.7 Deploying
+Deploy the whole folder (not just the HTML). After changing any file, bump `APP_VERSION` in `js/config/version.js` so installed apps pick up the update.
+
+## 15. Round 9 — Welcome Screen After Sign-In
+
+`WelcomeScreen` (`js/ui/welcome.js`, styles at the end of `css/app.css`) greets the user right after signing in — and, in local-only mode, once per app session:
+- Time-of-day greeting (with the name taken from the signed-in account), business name, date and a live clock.
+- **Today at a glance**: sales today (and month-to-date), splints remitted today, pending deliveries, low/out-of-stock count — each card jumps to its tab.
+- **Needs your attention**: pending deliveries, arrived POs awaiting check-in, out-of-stock/low items, un-handed issuances, payroll balance due, and (local mode) an overdue backup — or, on a brand-new setup, a **Getting started** checklist (business profile, workers, opening stock, first sale) until those are done.
+- Quick actions (Log Sale, Log Production, New Purchase, Add Expense), "Take the Tour" (hidden once the tour has been taken), "Go to Dashboard" (focused; Enter/Esc/any Ctrl+1–9 shortcut dismisses).
+- "Show this welcome screen when I open the app" checkbox, plus a toggle and Preview button in Settings → Preferences (per device). Explicit sign-in/sign-out always re-arms it.
+
+Also fixed while testing: the Financial report's summary cards never faded in (Reports was missing the metric-card animation trigger), and a welcome screen reopened within its 0.3s close animation got hidden by the pending close. `APP_VERSION` → 2026.3.1.
+
+Verification: welcome suite 21/21 (first open, greeting, checklist vs. attention list, live numbers incl. payroll due, quick action / Esc / shortcut dismissal, once-per-session, opt-out persistence, Settings toggle, light theme, 390px no overflow); main suite 106/106; PWA suite 10/10; zero console errors.
+
+## 16. Round 10 — index.html Is the Main File; Sidebar Account Footer
+
+- **Main file is now `index.html`** (moved with `git mv`, so its history follows). `Bebang2026.html` is a tiny redirect that keeps old links and bookmarks working (it forwards the `#tab` too). The manifest (`id`/`start_url` = `./`, shortcuts `./#sales` etc.) and the service worker (`SHELL = 'index.html'`) were updated. `APP_VERSION` → 2026.3.2.
+- **Sidebar footer** (desktop): avatar with initials, signed-in name + email ("Local Mode" when sync is off), a Dark / Light / Auto theme switch, and a **Log out** button (shown only when signed in to the shared account; asks for confirmation). Collapsed sidebar shows just the avatar, a one-click theme cycle button and a logout icon. On phones the bottom nav has no room, so the header theme button stays and the status pill opens Settings → Account & Sync (Sign Out).
+- Verification: sidebar suite 19/19 (redirect keeps tab, footer pinned to the bottom, local vs. signed-in states, initials, logout confirm → sign-out, theme buttons incl. Auto, collapsed mode, mobile behaviour); welcome 21/21; main 106/106; PWA 10/10; zero console errors.
+
+## 17. Round 11 — Styled Dialogs Replace Every Browser Pop-up
+
+All 24 native `confirm()` / `prompt()` / `alert()` calls ("This page says…") across 9 files were replaced by `Dialog` (`js/ui/dialog.js`, styles at the end of `css/app.css`), exposed as promise-based `App.ui.confirm()`, `App.ui.alert()` and `App.ui.prompt()`.
+
+- **Design:** coloured icon badge and top accent bar per tone (danger / warning / info / success), bold title, readable message, bullet list of consequences (e.g. "Stock is reversed: -10 SPLINT #50"), amber warning box (negative stock), small "This cannot be undone" note, and action-named buttons ("Delete" / "Keep it", "Log out" / "Stay signed in", "Restore Backup"…). Light and dark themes; on phones it slides up as a bottom sheet with full-width buttons.
+- **Safety & keyboard:** destructive dialogs focus Cancel so a stray Enter can't delete; Enter confirms otherwise, Esc cancels, Tab stays inside the dialog, Ctrl+1–9 is blocked behind it; multiple dialogs queue. Factory Reset is now one dialog with a type-DELETE field (button stays disabled until it matches exactly) instead of confirm + prompt.
+- **Every message was rewritten** with specifics: deletes show a one-line summary of the record (`RecordService.summary()`), backup restore shows the file name, export date and record counts, cost sync lists each price change, reconcile shows ledger vs. live stock, and so on. The old `#message-box` was removed. `APP_VERSION` → 2026.3.3.
+- Verification: new dialog suite 21/21 (no native pop-ups at all, content, Cancel focus on danger, Enter/Esc/Tab behaviour, shortcut blocking, confirm/cancel results, type-DELETE gating, queueing, alert, light theme, phone bottom sheet); sidebar 19/19, welcome 21/21, main 106/106, PWA 10/10; zero console errors.

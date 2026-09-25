@@ -1,0 +1,26 @@
+{
+    "name": "Bebang's Business Management System",
+    "short_name": "Bebang BMS",
+    "description": "Splint production, inventory, sales, payroll and reports for BC&E Medical Supplies.",
+    "id": "./",
+    "start_url": "./#dashboard",
+    "scope": "./",
+    "display": "standalone",
+    "display_override": ["window-controls-overlay", "standalone"],
+    "orientation": "any",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a",
+    "categories": ["business", "productivity", "finance"],
+    "icons": [
+        { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "assets/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ],
+    "shortcuts": [
+        { "name": "Log Sale", "short_name": "Sale", "url": "./#sales", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }] },
+        { "name": "Log Production", "short_name": "Production", "url": "./#manufacturing", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }] },
+        { "name": "Inventory", "short_name": "Stock", "url": "./#inventory", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }] },
+        { "name": "Reports", "short_name": "Reports", "url": "./#reports", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }] }
+    ]
+}
