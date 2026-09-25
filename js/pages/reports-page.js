@@ -22,13 +22,16 @@ class ReportsPage extends BasePage {
     }
 
     setView(view) { this.view = view; this.app.render('reports', { skipAnimation: true }); }
-    setRoute(sub) { this.view = ReportsPage.VIEWS.some(v => v.key === sub) ? sub : 'financial'; }
+    /** Sub-views this role may open (Financial needs reports.financial). */
+    get views() { return ReportsPage.VIEWS.filter(v => v.key !== 'financial' || this.app.can('reports.financial')); }
+    setRoute(sub) { this.view = this.views.some(v => v.key === sub) ? sub : this.views[0].key; }
     routeSuffix() { return this.view === 'financial' ? '' : this.view; }
     afterRender() { this.ui.animateMetrics(); }
 
     render() {
         if (!this.period) this.period = this.data.settings.defaultReportPeriod || 'month';
-        const views = ReportsPage.VIEWS.map(v => ({ ...v, count: v.key === 'expenses' ? this.data.expenses.length : undefined }));
+        if (!this.views.some(v => v.key === this.view)) this.view = this.views[0].key;
+        const views = this.views.map(v => ({ ...v, count: v.key === 'expenses' ? this.data.expenses.length : undefined }));
         const body = {
             financial: () => this.financialView(), stock: () => this.stockView(), ledger: () => this.ledgerView(),
             sales: () => this.salesView(), production: () => this.productionView(), expenses: () => this.expensesView()

@@ -119,7 +119,9 @@ class WelcomeScreen {
 
                 <p class="text-xs font-semibold uppercase tracking-wider text-secondary mt-7 mb-3 welcome-rise" style="animation-delay:.18s">Today at a glance</p>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    ${stat('Sales today', Utils.formatCurrency(s.todaySales), `${s.todayOrders} order${s.todayOrders === 1 ? '' : 's'} · month ${Utils.formatCurrency(s.month.revenue)}`, 'sales_up', 'sales', 'green', 0)}
+                    ${this.app.can('reports.financial')
+                        ? stat('Sales today', Utils.formatCurrency(s.todaySales), `${s.todayOrders} order${s.todayOrders === 1 ? '' : 's'} · month ${Utils.formatCurrency(s.month.revenue)}`, 'sales_up', 'sales', 'green', 0)
+                        : stat('Sales today', `${s.todayOrders} order${s.todayOrders === 1 ? '' : 's'}`, `${s.month.orders} this month`, 'sales_up', 'sales', 'green', 0)}
                     ${stat('Remitted today', `${Utils.formatNumber(s.remittedToday)} splints`, `${Utils.formatNumber(s.month.unitsProduced)} this month`, 'manufacturing', 'manufacturing', 'violet', 1)}
                     ${stat('Pending deliveries', s.pending.length, Utils.formatCurrency(s.pending.reduce((a, o) => a + (o.total || 0), 0)), 'truck', 'sales', 'amber', 2)}
                     ${stat('Low-stock items', s.low.length, s.out.length ? `${s.out.length} out of stock` : 'All in stock', 'alert', 'inventory', s.low.length ? 'red' : 'blue', 3)}

@@ -17,7 +17,7 @@ const ASSETS = [
     'js/vendor/firebase-app-compat.js', 'js/vendor/firebase-auth-compat.js', 'js/vendor/firebase-firestore-compat.js',
     'js/config/version.js', 'js/config/tailwind.config.js', 'js/config/firebase-config.js',
     'js/data/seed.js',
-    'js/core/utils.js', 'js/core/store.js', 'js/core/stock.js', 'js/core/finance.js', 'js/core/records.js', 'js/core/auth.js', 'js/core/access.js', 'js/core/pwa.js',
+    'js/core/utils.js', 'js/core/store.js', 'js/core/stock.js', 'js/core/finance.js', 'js/core/records.js', 'js/core/auth.js', 'js/core/permissions.js', 'js/core/access.js', 'js/core/pwa.js',
     'js/ui/ui.js', 'js/ui/dialog.js', 'js/ui/form-modal.js', 'js/ui/data-table.js', 'js/ui/printer.js', 'js/ui/widgets.js', 'js/ui/tour.js', 'js/ui/welcome.js',
     'js/pages/base-page.js', 'js/pages/dashboard-page.js', 'js/pages/procurement-page.js', 'js/pages/inventory-page.js',
     'js/pages/manufacturing-page.js', 'js/pages/sales-page.js', 'js/pages/reports-page.js', 'js/pages/costing-page.js',

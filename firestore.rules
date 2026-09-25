@@ -6,7 +6,8 @@ rules_version = '2';
 //
 //   business/main   the shared business data — approved users and admins only
 //   users/{uid}     one access record per signed-in account (pending/approved/rejected/revoked)
-//   invites/{email} emails the admin pre-approved (let in on first sign-in)
+//   invites/{email} emails the admin pre-approved (let in on first sign-in, with a role)
+//   config/access   roles & permissions (Settings → Roles / Access Matrix) — owner writes, approved users read
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -22,12 +23,27 @@ service cloud.firestore {
     function isApproved() {
       return isAdmin() || (signedIn() && exists(myRecord()) && get(myRecord()).data.status == 'approved');
     }
+    function inviteDoc() { return /databases/$(database)/documents/invites/$(myEmail()); }
     function invited() {
-      return signedIn() && verified() && exists(/databases/$(database)/documents/invites/$(myEmail()));
+      return signedIn() && verified() && exists(inviteDoc());
+    }
+    // People approved before roles existed have no roleId: they keep the Manager role.
+    function myRoleId() { return get(myRecord()).data.get('roleId', 'manager'); }
+    function accessConfig() { return /databases/$(database)/documents/config/access; }
+    // Roles whose permissions are all "view" are saved with readOnly: true — they may not write.
+    function roleIsReadOnly() {
+      return exists(accessConfig())
+        && get(accessConfig()).data.roles.get(myRoleId(), {}).get('readOnly', false) == true;
     }
 
     match /business/main {
-      allow read, write: if isApproved();
+      allow read: if isApproved();
+      allow write: if isAdmin() || (isApproved() && !roleIsReadOnly());
+    }
+
+    match /config/access {
+      allow read: if isApproved();
+      allow write: if isAdmin();
     }
 
     match /users/{uid} {
@@ -40,11 +56,17 @@ service cloud.firestore {
         && request.resource.data.role == 'user'
         && request.resource.data.email == request.auth.token.email
         && (request.resource.data.status == 'pending' || (request.resource.data.status == 'approved' && invited()))
+        // no role unless it's the one the owner put on your invitation
+        && (!('roleId' in request.resource.data)
+            || (invited() && request.resource.data.roleId == get(inviteDoc()).data.get('roleId', null)))
       );
       // You may refresh your own profile/last-seen, but never change your own status or role —
       // except asking again after a decline (rejected → pending). The admin can change anything.
       allow update: if isAdmin() || (
         signedIn() && request.auth.uid == uid
+        // only profile / last-seen / request fields — never your own role
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['displayName', 'photoURL', 'provider', 'lastSeenAt', 'status', 'requestedAt', 'note'])
         && request.resource.data.role == resource.data.role
         && request.resource.data.email == resource.data.email
         && (request.resource.data.status == resource.data.status

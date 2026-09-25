@@ -20,6 +20,7 @@ class DashboardPage extends BasePage {
             return { t, label: this.app.inventory.typeLabel(t), count: items.length, units: items.reduce((s, i) => s + i.stock, 0), value: items.reduce((s, i) => s + Math.max(0, i.stock) * (i.unit_cost || 0), 0) };
         });
         const s = d.settings;
+        const fin = this.app.can('reports.financial');
 
         return `
             ${this.ui.pageHeader('Business Dashboard', `${Utils.esc(s.businessTagline || '')} — ${new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
@@ -34,8 +35,8 @@ class DashboardPage extends BasePage {
                 <button onclick="App.navigate('reports')" class="quick-btn">📊 Reports</button>
             </div>
             <div class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
-                ${this.ui.metricCard(`Sales ${year}`, ytd.revenue, { color: 'text-green-400', index: 0, icon: 'sales_up', sub: `${ytd.orders} fulfilled orders · ${Utils.formatNumber(ytd.unitsSold)} units`, onclick: "App.navigate('reports')" })}
-                ${this.ui.metricCard(`Net Profit ${year}`, ytd.net, { color: ytd.net >= 0 ? 'text-blue-400' : 'text-red-400', index: 1, icon: 'costing', sub: `Purchases ${Utils.formatCurrency(ytd.purchases)} · Expenses ${Utils.formatCurrency(ytd.expenses)}` })}
+                ${!fin ? '' : this.ui.metricCard(`Sales ${year}`, ytd.revenue, { color: 'text-green-400', index: 0, icon: 'sales_up', sub: `${ytd.orders} fulfilled orders · ${Utils.formatNumber(ytd.unitsSold)} units`, onclick: "App.navigate('reports')" })}
+                ${!fin ? '' : this.ui.metricCard(`Net Profit ${year}`, ytd.net, { color: ytd.net >= 0 ? 'text-blue-400' : 'text-red-400', index: 1, icon: 'costing', sub: `Purchases ${Utils.formatCurrency(ytd.purchases)} · Expenses ${Utils.formatCurrency(ytd.expenses)}` })}
                 ${this.ui.metricCard('Inventory Value (Cost)', costValue, { color: 'text-accent', index: 2, icon: 'inventory', sub: `Retail value ${Utils.formatCurrency(retailValue)}`, onclick: "App.navigate('inventory')" })}
                 ${this.ui.metricCard('Pending Deliveries', pendingSOs.length, { currency: false, index: 3, icon: 'truck', sub: Utils.formatCurrency(pendingSOs.reduce((a, o) => a + (o.total || 0), 0)), onclick: "App.navigate('sales')" })}
                 ${this.ui.metricCard('Low-Stock Items', lowStock.length, { currency: false, color: lowStock.length ? 'text-red-400' : 'text-white', index: 4, icon: 'alert', sub: `${pendingPOs.length} purchase order(s) open`, onclick: "App.navigate('inventory')" })}
@@ -70,10 +71,10 @@ class DashboardPage extends BasePage {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            ${!fin ? '' : `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 ${this.salesChart()}
                 ${this.profitChart()}
-            </div>
+            </div>`}
             ${this.recentActivity()}
         `;
     }

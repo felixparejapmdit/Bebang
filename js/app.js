@@ -44,11 +44,31 @@ class BebangApp {
             costing: new CostingPage(this), payroll: new PayrollPage(this), settings: new SettingsPage(this)
         };
         Object.assign(this, this.pages);
+        // Role-based permissions: wrap every action once all objects exist.
+        this.guard = new PermissionGuard(this);
+        this.guard.install();
         this.currentTab = null;
         this._booted = false;
     }
 
     get data() { return this.store.data; }
+
+    // ---------------- Permissions ----------------
+    /** Local-only mode and the owner can do everything. */
+    get fullAccess() { return !this.store.configured || this.access.isAdmin; }
+    can(perm) { return this.access.can(perm); }
+    canViewTab(tab) { return tab === 'settings' || this.can(`${tab}.view`); }
+    firstAllowedTab() { return (BebangApp.TABS.find(t => this.canViewTab(t.key)) || { key: 'settings' }).key; }
+    /** Role or role settings changed: rebuild the sidebar and redraw (or leave a page that's no longer allowed). */
+    onPermissionsChanged() {
+        this.renderSidebar();
+        if (!this._booted || !this.currentTab) return;
+        if (!this.canViewTab(this.currentTab)) {
+            this.ui.toast("Your role no longer includes that page.", 'info');
+            return this.navigate(this.firstAllowedTab(), { push: false });
+        }
+        if (!this.isUserBusy()) this.render(this.currentTab, { skipAnimation: true, keepScroll: true });
+    }
 
     // ---------------- Boot ----------------
     start() {
@@ -106,7 +126,10 @@ class BebangApp {
     }
 
     onAccessRecord(rec) {
-        if ((rec && rec.status === 'approved') || this.access.isAdmin) return this.enterApp();
+        if ((rec && rec.status === 'approved') || this.access.isAdmin) {
+            if (this._screen === 'app') return this.onPermissionsChanged(); // e.g. the owner changed their role
+            return this.enterApp();
+        }
         if (this._booted) return location.reload(); // access removed while using the app
         this.showAccessScreen(rec ? rec.status : 'removed', rec);
     }
@@ -117,6 +140,8 @@ class BebangApp {
         document.body.classList.toggle('is-admin', this.access.isAdmin);
         this.updateStatusPill();
         if (this.access.isAdmin && !this._adminStarted) { this._adminStarted = true; this.access.startAdmin(); }
+        this.access.watchConfig(() => this.onPermissionsChanged());
+        this.renderSidebar();
         if (wasWaiting) this.ui.toast('Your access was approved — welcome to Bebang BMS!', 'success', { duration: 6000 });
         if (!this._booted) {
             if (wasWaiting) this.welcome.resetSession();
@@ -274,6 +299,12 @@ class BebangApp {
     /** User navigation: adds a browser-history entry so Back/Forward (and Android back) move between pages. */
     navigate(route, { push = true } = {}) {
         if (this.welcome.isOpen) this.welcome.dismiss();
+        const wanted = String(route || '').split('/')[0];
+        if (this.pages[wanted] && !this.canViewTab(wanted)) {
+            this.ui.toast("Your role doesn't include that page. Ask the administrator if you need it.", 'error');
+            if (this.currentTab && this.canViewTab(this.currentTab)) return;
+            route = this.firstAllowedTab();
+        }
         const tab = this.applyRoute(route);
         if (tab === 'settings') this.setSettingsMenuOpen(true);
         this._pushHistory = push;
@@ -282,6 +313,7 @@ class BebangApp {
     }
     render(tabName = this.currentTab || 'dashboard', { skipAnimation = false, keepScroll } = {}) {
         if (String(tabName).includes('/')) tabName = this.applyRoute(tabName);
+        if (this.pages[tabName] && !this.canViewTab(tabName)) tabName = this.firstAllowedTab();
         this.store.consumePendingRemote();
         const page = this.pages[tabName] || this.pages.dashboard;
         tabName = this.pages[tabName] ? tabName : 'dashboard';
@@ -297,6 +329,7 @@ class BebangApp {
         try {
             content.innerHTML = `<div class="content-inner">${page.render()}</div>`;
             page.afterRender();
+            this.guard.apply(content);
         } catch (err) {
             console.error(`Error rendering ${tabName}:`, err);
             content.innerHTML = `<div class="content-inner"><div class="glass-panel p-6"><h2 class="text-xl font-bold text-red-400 mb-2">Something went wrong showing this page.</h2><p class="text-sm text-secondary mb-3">${Utils.esc(err.message)}</p><button class="dt-btn" onclick="App.navigate('dashboard')">Back to Dashboard</button></div></div>`;
@@ -338,7 +371,7 @@ class BebangApp {
         document.getElementById('sidebar').innerHTML = BebangApp.TABS.map((t, i) => {
             const group = t.key === 'settings';
             return `
-            <div class="tooltip-container nav-button-container ${group ? `nav-group ${open ? 'open' : ''}` : ''}" id="nav-btn-container-${t.key}">
+            <div class="tooltip-container nav-button-container ${group ? `nav-group ${open ? 'open' : ''}` : ''} ${this.canViewTab(t.key) ? '' : 'perm-hidden'}" id="nav-btn-container-${t.key}">
                 <button type="button" data-tab="${t.key}" ${group ? 'data-group="settings" aria-controls="nav-sub-settings"' : ''} ${group ? `aria-expanded="${open}"` : ''} data-shortcut="Ctrl + ${i + 1}" class="nav-button glass-item text-secondary w-full py-2 px-3 md:py-2.5 rounded-xl text-left flex items-center space-x-1 sm:space-x-3 text-xs sm:text-sm font-medium" aria-label="${t.label}">
                     ${this.ui.icon(t.key)}
                     <span class="nav-label-full">${t.label}</span>
@@ -347,8 +380,9 @@ class BebangApp {
                 </button>
                 <span class="tooltip-text">${t.label} · Ctrl/⌘ + ${i + 1}</span>
                 ${group ? `<div class="nav-sub" id="nav-sub-settings" role="group" aria-label="Settings sections">
-                    ${SettingsPage.SECTIONS.map(s => `
-                        <button type="button" class="nav-sub-button" data-tab="settings" data-sub="${s.key}" ${s.adminOnly ? 'data-admin-only' : ''}>
+                    ${this.settings.sections.map((s, j, arr) => `
+                        ${j === 0 || arr[j - 1].group !== s.group ? `<span class="nav-sub-heading">${s.group}</span>` : ''}
+                        <button type="button" class="nav-sub-button" data-tab="settings" data-sub="${s.key}">
                             ${this.ui.icon(s.icon, 'w-4 h-4')}<span>${s.label}</span><span class="nav-sub-badge hidden" data-badge="${s.key}"></span>
                         </button>`).join('')}
                 </div>` : ''}
@@ -410,6 +444,7 @@ class BebangApp {
                 <span class="sidebar-user-text">
                     <span class="sidebar-user-name text-white">${Utils.esc(name)}</span>
                     <span class="sidebar-user-email">${Utils.esc(sub)}</span>
+                    ${user && this.access.enabled ? `<span class="sidebar-role badge badge-${this.access.roleColor(this.access.myRoleId)}">${Utils.esc(this.access.roleName(this.access.myRoleId))}</span>` : ''}
                 </span>
             </div>
             <div class="seg sidebar-theme" role="group" aria-label="Theme mode">
@@ -511,7 +546,7 @@ class BebangApp {
             const meta = e.metaKey || e.ctrlKey;
             if (meta && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9') {
                 const tab = BebangApp.TABS[parseInt(e.key, 10) - 1];
-                if (tab && this._booted) { e.preventDefault(); this.navigate(tab.key); }
+                if (tab && this._booted) { e.preventDefault(); if (this.canViewTab(tab.key)) this.navigate(tab.key); }
                 return;
             }
             if (this.tour.isOpen) {

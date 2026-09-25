@@ -24,6 +24,7 @@ class AccessService {
         this.users = [];           // admin: every access record (live)
         this.invites = [];         // admin: pre-approved emails (live)
         this.rulesMissing = false; // admin fallback when firestore.rules isn't deployed yet
+        this.config = null;        // config/access: { roles, defaultRoleId } — null = built-in defaults
         this._unsubs = [];
         this._knownPending = null;
     }
@@ -35,6 +36,52 @@ class AccessService {
     isAdminUser(user) { return !!(user && user.emailVerified && AccessService.isAdminEmail(user.email)); }
     get isAdmin() { return this.isAdminUser(this.cloud.user); }
     get pendingCount() { return this.users.filter(u => u.status === 'pending').length; }
+
+    // ---------------- roles & permissions ----------------
+    get roles() { return (this.config && this.config.roles) || DEFAULT_ROLES; }
+    get defaultRoleId() { const id = this.config && this.config.defaultRoleId; return id && this.roles[id] ? id : (this.roles[DEFAULT_ROLE_ID] ? DEFAULT_ROLE_ID : Object.keys(this.roles)[0]); }
+    roleIdOf(rec) {
+        if (!rec) return null;
+        if (rec.role === 'admin') return 'owner';
+        const id = rec.roleId || LEGACY_ROLE_ID;
+        return this.roles[id] ? id : this.defaultRoleId; // a deleted role falls back to the default
+    }
+    roleName(id) { return id === 'owner' ? 'Owner' : ((this.roles[id] || {}).name || 'Unknown role'); }
+    roleColor(id) { return id === 'owner' ? 'violet' : ((this.roles[id] || {}).color || 'gray'); }
+    get myRoleId() { return this.isAdmin ? 'owner' : this.roleIdOf(this.record); }
+    get permissions() {
+        if (!this.enabled || this.isAdmin) return new Set(ALL_PERMISSIONS);
+        const role = this.roles[this.myRoleId];
+        return new Set(role ? role.permissions : []);
+    }
+    can(perm) { return !this.enabled || this.isAdmin || this.permissions.has(perm); }
+
+    configRef() { return this.db.collection('config').doc('access'); }
+    watchConfig(onChange) {
+        if (this._configUnsub) return;
+        this._configUnsub = this.configRef().onSnapshot(snap => {
+            this.config = snap.exists ? snap.data() : null;
+            onChange();
+            // First time the owner opens the app: store the built-in roles so they can be edited.
+            if (!snap.exists && this.isAdmin && !this._seededConfig) { this._seededConfig = true; this.saveConfig({ roles: DEFAULT_ROLES, defaultRoleId: DEFAULT_ROLE_ID }).catch(() => {}); }
+        }, err => console.warn('Role settings unavailable:', err.code));
+    }
+    /** Owner: save roles (the readOnly flag on each role is what the security rules check). */
+    async saveConfig({ roles, defaultRoleId }) {
+        const clean = {};
+        Object.entries(roles).forEach(([id, r]) => {
+            const permissions = [...new Set(r.permissions)].filter(p => ALL_PERMISSIONS.includes(p));
+            clean[id] = { name: r.name, color: r.color || 'gray', description: r.description || '', permissions, readOnly: isReadOnlyRole(permissions) };
+        });
+        const me = this.cloud.user;
+        const next = { roles: clean, defaultRoleId: clean[defaultRoleId] ? defaultRoleId : Object.keys(clean)[0], updatedAt: this.now(), updatedBy: me ? me.email : 'owner' };
+        await this.configRef().set(next);
+        this.config = next;
+    }
+    async setRole(uid, roleId) {
+        const me = this.cloud.user;
+        await this.userRef(uid).update({ roleId, roleChangedAt: this.now(), roleChangedBy: me ? me.email : 'owner' });
+    }
 
     userRef(uid) { return this.db.collection('users').doc(uid); }
     inviteRef(email) { return this.db.collection('invites').doc(String(email).trim().toLowerCase()); }
@@ -54,15 +101,20 @@ class AccessService {
         const profile = { email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '', provider: this.providerOf(user), lastSeenAt: this.now() };
         const snap = await ref.get();
         if (!snap.exists) {
-            let invited = false;
+            let invited = false, inviteRole = null;
             if (!admin && user.email && user.emailVerified) {
-                try { invited = (await this.inviteRef(user.email).get()).exists; } catch (e) { invited = false; }
+                try {
+                    const inv = await this.inviteRef(user.email).get();
+                    invited = inv.exists;
+                    inviteRole = invited ? (inv.data().roleId || null) : null;
+                } catch (e) { invited = false; }
             }
             const rec = {
                 uid: user.uid, ...profile, role: admin ? 'admin' : 'user',
                 status: admin || invited ? 'approved' : 'pending',
                 requestedAt: this.now(),
-                ...(admin || invited ? { decidedAt: this.now(), decidedBy: admin ? 'auto (admin)' : 'invitation' } : {})
+                ...(admin || invited ? { decidedAt: this.now(), decidedBy: admin ? 'auto (admin)' : 'invitation' } : {}),
+                ...(inviteRole ? { roleId: inviteRole } : {})
             };
             await ref.set(rec);
             return rec;
@@ -124,14 +176,14 @@ class AccessService {
     }
     stopAdmin() { this._unsubs.forEach(u => u()); this._unsubs = []; this._knownPending = null; }
 
-    async setStatus(uid, status, note = '') {
+    async setStatus(uid, status, note = '', roleId = null) {
         const me = this.cloud.user;
-        await this.userRef(uid).update({ status, note, decidedAt: this.now(), decidedBy: me ? me.email : 'admin' });
+        await this.userRef(uid).update({ status, note, decidedAt: this.now(), decidedBy: me ? me.email : 'admin', ...(roleId ? { roleId } : {}) });
     }
     async removeRecord(uid) { await this.userRef(uid).delete(); }
-    async invite(email, note = '') {
+    async invite(email, note = '', roleId = null) {
         const me = this.cloud.user;
-        await this.inviteRef(email).set({ note, invitedAt: this.now(), invitedBy: me ? me.email : 'admin' });
+        await this.inviteRef(email).set({ note, invitedAt: this.now(), invitedBy: me ? me.email : 'admin', roleId: roleId || this.defaultRoleId });
     }
     async removeInvite(email) { await this.inviteRef(email).delete(); }
 }

@@ -169,7 +169,7 @@ class DataTable {
 
     refresh(id) {
         const body = document.getElementById(`dt-${id}-body`);
-        if (body && this._entry(id)) body.innerHTML = this._bodyHtml(id);
+        if (body && this._entry(id)) { body.innerHTML = this._bodyHtml(id); this.app.guard.apply(body); }
     }
     search(id, value) { const e = this._entry(id); if (!e) return; e.state.search = value; e.state.page = 1; this.refresh(id); }
     sort(id, key) {
