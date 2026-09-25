@@ -168,6 +168,7 @@ class SettingsPage extends BasePage {
         });
     }
     async setUserRole(uid, roleId) {
+        if (document.activeElement && document.activeElement.classList.contains('role-select')) document.activeElement.blur();
         const u = this.accessUser(uid);
         try {
             await this.app.access.setRole(uid, roleId);

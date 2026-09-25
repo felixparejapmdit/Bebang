@@ -128,6 +128,7 @@ class FormModal {
     close() {
         this.el.classList.remove('visible');
         this.config = null;
+        this.app.flushDeferredRender();
     }
     get isOpen() { return this.el.classList.contains('visible'); }
 }

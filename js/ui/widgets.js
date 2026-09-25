@@ -114,7 +114,7 @@ class BomEditor {
         this.renderList();
         this.el.classList.add('visible');
     }
-    close() { this.el.classList.remove('visible'); this.productId = null; this.draft = []; }
+    close() { this.el.classList.remove('visible'); this.productId = null; this.draft = []; this.app.flushDeferredRender(); }
 
     renderList() {
         const inv = this.app.data.inventory;

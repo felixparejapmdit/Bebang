@@ -67,7 +67,7 @@ class BebangApp {
             this.ui.toast("Your role no longer includes that page.", 'info');
             return this.navigate(this.firstAllowedTab(), { push: false });
         }
-        if (!this.isUserBusy()) this.render(this.currentTab, { skipAnimation: true, keepScroll: true });
+        this.requestRender();
     }
 
     // ---------------- Boot ----------------
@@ -244,7 +244,24 @@ class BebangApp {
         document.querySelectorAll('[data-badge="users"]').forEach(b => { b.textContent = n; b.classList.toggle('hidden', !n); });
         const dot = document.getElementById('settings-nav-dot');
         if (dot) dot.classList.toggle('hidden', !n);
-        if (this.currentTab === 'settings' && ['users', 'overview'].includes(this.settings.view) && !this.isUserBusy()) this.render('settings', { skipAnimation: true, keepScroll: true });
+        if (this.currentTab === 'settings' && ['users', 'roles', 'overview'].includes(this.settings.view)) this.requestRender();
+    }
+
+    /**
+     * Redraw the current page now — or, if the user is mid-action (typing, a dialog open, a dropdown
+     * focused), as soon as they finish, so live updates are never silently dropped.
+     */
+    requestRender({ toast } = {}) {
+        if (toast) this._deferredToast = toast;
+        if (this.isUserBusy()) { this._renderDeferred = true; return; }
+        this._renderDeferred = false;
+        this.render(this.currentTab || 'dashboard', { skipAnimation: true, keepScroll: true });
+        if (this._deferredToast) { this.ui.toast(this._deferredToast, 'info', { duration: 2500 }); this._deferredToast = null; }
+    }
+    /** Called when a dialog closes or focus leaves a field: runs a redraw that was held back. */
+    flushDeferredRender() {
+        if (!this._renderDeferred) return;
+        setTimeout(() => { if (this._renderDeferred && !this.isUserBusy()) this.requestRender(); }, 30);
     }
 
     _boot() {
@@ -262,9 +279,8 @@ class BebangApp {
             this.welcome.maybeShow();
             return;
         }
-        if (this.isUserBusy()) return; // held in store.pendingRemote; folded in on the next render
-        this.render(this.currentTab || 'dashboard', { skipAnimation: true, keepScroll: true });
-        this.ui.toast('Updated with changes from another device.', 'info', { duration: 2500 });
+        // Held in store.pendingRemote while the user is busy, then shown as soon as they finish.
+        this.requestRender({ toast: 'Updated with changes from another device.' });
     }
 
     /** True while the user is typing in a form or has a dialog open — don't redraw under them. */
@@ -513,6 +529,7 @@ class BebangApp {
 
     // ---------------- Events ----------------
     setupEventListeners() {
+        document.getElementById('content').addEventListener('focusout', () => this.flushDeferredRender());
         document.getElementById('sidebar').addEventListener('click', (e) => {
             const sub = e.target.closest('.nav-sub-button');
             if (sub) return this.navigate(`${sub.dataset.tab}/${sub.dataset.sub}`);

@@ -109,6 +109,7 @@ class Dialog {
         if (!this.current) return;
         const { resolve } = this.current;
         this.current = null;
+        if (window.App && window.App.flushDeferredRender) setTimeout(() => window.App.flushDeferredRender(), 170);
         const el = this.el;
         el.classList.add('dlg-leave');
         setTimeout(() => {
