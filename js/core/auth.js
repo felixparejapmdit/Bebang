@@ -46,6 +46,7 @@ class AuthService {
         const box = document.getElementById('auth-email-form');
         const show = open ?? box.classList.contains('hidden');
         box.classList.toggle('hidden', !show);
+        document.getElementById('auth-email-toggle').setAttribute('aria-expanded', show);
         if (show) document.getElementById('auth-email').focus();
     }
 
@@ -55,8 +56,10 @@ class AuthService {
         this._showError('');
         if (!email || !password) return this._showError('Please enter both email and password.');
         const btn = document.getElementById('auth-signin-btn');
+        const label = document.getElementById('auth-signin-label');
         btn.disabled = true;
-        btn.textContent = 'Signing in...';
+        btn.classList.add('loading');
+        label.textContent = 'Signing in…';
         try {
             this.app.welcome.resetSession();
             await this.cloud.auth.signInWithEmailAndPassword(email, password);
@@ -65,7 +68,8 @@ class AuthService {
             this._showError(this.friendlyError(error));
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Sign In';
+            btn.classList.remove('loading');
+            label.textContent = 'Sign In';
         }
     }
 
@@ -97,7 +101,11 @@ class AuthService {
 
     togglePasswordVisibility() {
         const input = document.getElementById('auth-password');
-        input.type = input.type === 'password' ? 'text' : 'password';
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        const eye = document.getElementById('auth-eye');
+        eye.setAttribute('aria-pressed', show);
+        eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
     }
 
     async signOut({ ask = true } = {}) {

@@ -94,6 +94,7 @@ class BebangApp {
     /** Which full-screen layer is visible: splash | auth | access | app. */
     showScreen(name, splashText) {
         this._screen = name;
+        document.getElementById('login-bg').classList.toggle('hidden', name === 'app');
         document.getElementById('boot-splash').classList.toggle('hidden', name !== 'splash');
         document.getElementById('auth-screen').classList.toggle('hidden', name !== 'auth');
         document.getElementById('access-screen').classList.toggle('hidden', name !== 'access');
